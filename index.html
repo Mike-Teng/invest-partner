@@ -2,9 +2,21 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <!-- 1. 網頁圖示 (瀏覽器分頁小圖示) -->
     <link rel="icon" type="image/svg+xml" href="/icon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>invest-partner</title>
+    
+    <!-- 2. iOS 主畫面圖示 (關鍵設定) -->
+    <!-- iPhone 會自動尋找這個檔案 -->
+    <link rel="apple-touch-icon" href="/icon.png" />
+    
+    <!-- 3. iOS Web App 模式設定 -->
+    <!--這讓使用者從主畫面開啟時，會隱藏網址列，像原生 App 一樣全螢幕 -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="InvestPartner" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>InvestPartner</title>
   </head>
   <body>
     <div id="root"></div>
