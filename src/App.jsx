@@ -326,11 +326,11 @@ export default function App() {
             <table className="w-full text-left">
               <thead>
                 <tr className="text-slate-400 text-sm border-b border-slate-100">
-                  <th className="pb-3 font-medium">投資人</th>
-                  <th className="pb-3 font-medium">投入本金</th>
-                  <th className="pb-3 font-medium">佔比</th>
-                  <th className="pb-3 font-medium">當前淨值</th>
-                  <th className="pb-3 font-medium">個人損益</th>
+                  <th className="pb-3 font-medium whitespace-nowrap">投資人</th>
+                  <th className="pb-3 font-medium whitespace-nowrap">投入本金</th>
+                  <th className="pb-3 font-medium whitespace-nowrap">佔比</th>
+                  <th className="pb-3 font-medium whitespace-nowrap">當前淨值</th>
+                  <th className="pb-3 font-medium whitespace-nowrap">個人損益</th>
                 </tr>
               </thead>
               <tbody className="text-slate-600">
@@ -342,11 +342,11 @@ export default function App() {
 
                   return (
                     <tr key={inv} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
-                      <td className="py-4 font-medium text-slate-800">{inv}</td>
-                      <td className="py-4">{secureMoney(invested)}</td>
-                      <td className="py-4 text-slate-500">{isAllowed ? formatPercent(ratio) : "****"}</td>
-                      <td className="py-4 font-bold text-blue-600">{secureMoney(currentValue)}</td>
-                      <td className={`py-4 ${!isAllowed ? 'text-slate-600' : (pl >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+                      <td className="py-4 font-medium text-slate-800 whitespace-nowrap">{inv}</td>
+                      <td className="py-4 whitespace-nowrap">{secureMoney(invested)}</td>
+                      <td className="py-4 text-slate-500 whitespace-nowrap">{isAllowed ? formatPercent(ratio) : "****"}</td>
+                      <td className="py-4 font-bold text-blue-600 whitespace-nowrap">{secureMoney(currentValue)}</td>
+                      <td className={`py-4 whitespace-nowrap ${!isAllowed ? 'text-slate-600' : (pl >= 0 ? 'text-green-600' : 'text-red-600')}`}>
                         {isAllowed && (pl >= 0 ? '+' : '')}{secureMoney(pl)}
                       </td>
                     </tr>
@@ -441,20 +441,20 @@ export default function App() {
               <table className="w-full text-left">
                 <thead className="bg-white sticky top-0 shadow-sm">
                   <tr className="text-slate-400 text-sm">
-                    <th className="p-4 font-medium">日期</th>
-                    <th className="p-4 font-medium">投資人</th>
-                    <th className="p-4 font-medium text-right">金額</th>
-                    {isAdmin && <th className="p-4 font-medium w-16 text-center">操作</th>}
+                    <th className="p-4 font-medium whitespace-nowrap">日期</th>
+                    <th className="p-4 font-medium whitespace-nowrap">投資人</th>
+                    <th className="p-4 font-medium text-right whitespace-nowrap">金額</th>
+                    {isAdmin && <th className="p-4 font-medium w-16 text-center whitespace-nowrap">操作</th>}
                   </tr>
                 </thead>
                 <tbody className="text-slate-600 divide-y divide-slate-50">
                   {[...funds].sort((a,b) => new Date(b.date) - new Date(a.date)).map(f => (
                     <tr key={f.id} className="hover:bg-slate-50">
-                      <td className="p-4 text-sm">{f.date}</td>
-                      <td className="p-4 font-medium">{f.investor}</td>
-                      <td className="p-4 text-right font-mono text-slate-800">{secureMoney(f.amount)}</td>
+                      <td className="p-4 text-sm whitespace-nowrap">{f.date}</td>
+                      <td className="p-4 font-medium whitespace-nowrap">{f.investor}</td>
+                      <td className="p-4 text-right font-mono text-slate-800 whitespace-nowrap">{secureMoney(f.amount)}</td>
                       {isAdmin && (
-                        <td className="p-4 text-center">
+                        <td className="p-4 text-center whitespace-nowrap">
                           <button onClick={() => handleDelete(f.id)} className="p-2 bg-red-50 text-red-500 rounded-full hover:bg-red-100">
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -558,26 +558,26 @@ export default function App() {
               <table className="w-full text-left">
                 <thead className="bg-white sticky top-0 shadow-sm">
                   <tr className="text-slate-400 text-sm">
-                    <th className="p-4 font-medium">日期</th>
-                    <th className="p-4 font-medium">代號</th>
-                    <th className="p-4 font-medium">類別</th>
-                    <th className="p-4 font-medium text-right">成交價</th>
-                    <th className="p-4 font-medium text-right">股數</th>
-                    <th className="p-4 font-medium text-right">總額</th>
-                    {isAdmin && <th className="p-4 font-medium w-16 text-center">操作</th>}
+                    <th className="p-4 font-medium whitespace-nowrap">日期</th>
+                    <th className="p-4 font-medium whitespace-nowrap">代號</th>
+                    <th className="p-4 font-medium whitespace-nowrap">類別</th>
+                    <th className="p-4 font-medium text-right whitespace-nowrap">成交價</th>
+                    <th className="p-4 font-medium text-right whitespace-nowrap">股數</th>
+                    <th className="p-4 font-medium text-right whitespace-nowrap">總額</th>
+                    {isAdmin && <th className="p-4 font-medium w-16 text-center whitespace-nowrap">操作</th>}
                   </tr>
                 </thead>
                 <tbody className="text-slate-600 divide-y divide-slate-50">
                   {[...trades].sort((a,b) => new Date(b.date) - new Date(a.date)).map(t => (
                     <tr key={t.id} className="hover:bg-slate-50">
-                      <td className="p-4 text-sm">{t.date}</td>
+                      <td className="p-4 text-sm whitespace-nowrap">{t.date}</td>
                       <td className="p-4 font-bold">{t.ticker}</td>
-                      <td className="p-4"><span className={`px-2 py-1 rounded text-xs font-bold ${t.type === 'BUY' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{t.type === 'BUY' ? '買入' : '賣出'}</span></td>
-                      <td className="p-4 text-right">{t.price}</td>
-                      <td className="p-4 text-right">{t.qty}</td>
-                      <td className="p-4 text-right font-mono text-slate-800">{secureMoney(t.price * t.qty)}</td>
+                      <td className="p-4 whitespace-nowrap"><span className={`px-2 py-1 rounded text-xs font-bold ${t.type === 'BUY' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{t.type === 'BUY' ? '買入' : '賣出'}</span></td>
+                      <td className="p-4 text-right whitespace-nowrap">{t.price}</td>
+                      <td className="p-4 text-right whitespace-nowrap">{t.qty}</td>
+                      <td className="p-4 text-right font-mono text-slate-800 whitespace-nowrap">{secureMoney(t.price * t.qty)}</td>
                       {isAdmin && (
-                        <td className="p-4 text-center"><button onClick={() => handleDelete(t.id)} className="p-2 bg-slate-100 text-slate-400 rounded-full hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></td>
+                        <td className="p-4 text-center whitespace-nowrap"><button onClick={() => handleDelete(t.id)} className="p-2 bg-slate-100 text-slate-400 rounded-full hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></td>
                       )}
                     </tr>
                   ))}
@@ -674,22 +674,22 @@ export default function App() {
              <table className="w-full text-left">
               <thead>
                 <tr className="text-slate-400 text-sm border-b border-slate-100">
-                  <th className="pb-3 font-medium pl-4">代號</th>
-                  <th className="pb-3 font-medium text-right">持有股數</th>
-                  <th className="pb-3 font-medium text-right">平均成本</th>
-                  <th className="pb-3 font-medium text-right w-40">現價 {isAdmin ? '(可編輯)' : ''}</th>
-                  <th className="pb-3 font-medium text-right">市值</th>
-                  <th className="pb-3 font-medium text-right">未實現損益</th>
-                  <th className="pb-3 font-medium text-right pr-4">報酬率</th>
+                  <th className="pb-3 font-medium pl-4 whitespace-nowrap">代號</th>
+                  <th className="pb-3 font-medium text-right whitespace-nowrap">持有股數</th>
+                  <th className="pb-3 font-medium text-right whitespace-nowrap">平均成本</th>
+                  <th className="pb-3 font-medium text-right w-40 whitespace-nowrap">現價 {isAdmin ? '(可編輯)' : ''}</th>
+                  <th className="pb-3 font-medium text-right whitespace-nowrap">市值</th>
+                  <th className="pb-3 font-medium text-right whitespace-nowrap">未實現損益</th>
+                  <th className="pb-3 font-medium text-right pr-4 whitespace-nowrap">報酬率</th>
                 </tr>
               </thead>
               <tbody className="text-slate-600 divide-y divide-slate-50">
                 {portfolioStats.holdingsList.map(item => (
                   <tr key={item.ticker} className="hover:bg-slate-50">
-                    <td className="py-4 pl-4 font-bold text-slate-800">{item.ticker}</td>
-                    <td className="py-4 text-right">{item.qty}</td>
-                    <td className="py-4 text-right text-slate-500">{item.avgCost.toFixed(2)}</td>
-                    <td className="py-4 text-right">
+                    <td className="py-4 pl-4 font-bold text-slate-800 whitespace-nowrap">{item.ticker}</td>
+                    <td className="py-4 text-right whitespace-nowrap">{item.qty}</td>
+                    <td className="py-4 text-right text-slate-500 whitespace-nowrap">{item.avgCost.toFixed(2)}</td>
+                    <td className="py-4 text-right whitespace-nowrap">
                        <input 
                         type="number" 
                         step="0.1"
@@ -700,11 +700,11 @@ export default function App() {
                         className={`input-field w-24 text-right ${isAdmin ? 'bg-indigo-50/50 border-indigo-200' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
                       />
                     </td>
-                    <td className="py-4 text-right font-medium text-slate-800">{secureMoney(item.currentValue)}</td>
-                    <td className={`py-4 text-right font-medium ${!isAllowed ? 'text-slate-600' : (item.unrealizedPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+                    <td className="py-4 text-right font-medium text-slate-800 whitespace-nowrap">{secureMoney(item.currentValue)}</td>
+                    <td className={`py-4 text-right font-medium whitespace-nowrap ${!isAllowed ? 'text-slate-600' : (item.unrealizedPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
                       {isAllowed && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}
                     </td>
-                    <td className={`py-4 text-right pr-4 font-bold ${!isAllowed ? 'text-slate-600' : (item.returnRate >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+                    <td className={`py-4 text-right pr-4 font-bold whitespace-nowrap ${!isAllowed ? 'text-slate-600' : (item.returnRate >= 0 ? 'text-green-600' : 'text-red-600')}`}>
                       {isAllowed ? formatPercent(item.returnRate) : "****"}
                     </td>
                   </tr>
@@ -732,7 +732,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      <nav className="fixed bottom-0 w-full bg-white border-t border-slate-200 md:w-64 md:h-full md:border-t-0 md:border-r md:left-0 z-50 flex md:flex-col justify-between md:justify-start">
+      {/* 修正 1: 在 mobile 模式增加 pb-2，將按鈕往上推，避免被手機下方 Home Bar 切到 */}
+      <nav className="fixed bottom-0 w-full bg-white border-t border-slate-200 md:w-64 md:h-full md:border-t-0 md:border-r md:left-0 z-50 flex md:flex-col justify-between md:justify-start pb-2 md:pb-0">
         <div className="hidden md:flex items-center p-6 border-b border-slate-100">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 text-lg">$</div>
           <span className="text-xl font-bold text-slate-800">InvestPartner</span>
