@@ -1,25 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc } from "firebase/firestore";
-// 新增 Authentication 相關模組
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
+// 1. 引入 Recharts 圖表套件
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+// 2. 將原本的 PieChart 圖示改名為 PieChartIcon，避免跟圖表組件名稱衝突
 import { 
-  LayoutDashboard, 
-  Wallet, 
-  TrendingUp, 
-  PieChart, 
-  ArrowUpRight, 
-  ArrowDownRight, 
-  Trash2, 
-  Plus,
-  Save,
-  Users,
-  AlertCircle,
-  LogIn,
-  LogOut,
-  Lock
+  LayoutDashboard, Wallet, TrendingUp, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, 
+  Trash2, Plus, Save, Users, AlertCircle, LogIn, LogOut, Lock, ShieldAlert, Settings, X
 } from 'lucide-react';
 
+// --- Firebase 設定 ---
 const firebaseConfig = {
   apiKey: "AIzaSyAXq_gDK2tr-g-Ak9H0_CBOQtO1PLhNKO8",
   authDomain: "investpartner-eec26.firebaseapp.com",
@@ -33,11 +24,13 @@ const firebaseConfig = {
 // 初始化 Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); // 初始化 Auth
+const auth = getAuth(app); 
 
-// --- 【重要設定】請在此輸入您的管理員 Email ---
-// 只有這個 Email 登入後，才能看到「新增」與「刪除」按鈕
+// --- 【權限設定區域】 ---
 const ADMIN_EMAIL = "m88215@gmail.com"; 
+
+// --- 圖表顏色配置 (藍, 綠, 黃, 紅, 紫, 粉, 靛) ---
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
 
 // --- 輔助函數 ---
 const formatMoney = (amount) => {
@@ -54,20 +47,23 @@ export default function App() {
   
   // 使用者狀態
   const [user, setUser] = useState(null);
-  // 是否為管理員 (只有您能寫入)
+  const [allowedEmails, setAllowedEmails] = useState([]);
+  
+  // --- 權限判斷邏輯 ---
   const isAdmin = user && user.email === ADMIN_EMAIL;
+  const isAllowed = user && (allowedEmails.includes(user.email) || isAdmin);
   
   const [funds, setFunds] = useState([]);
   const [trades, setTrades] = useState([]);
   const [marketPrices, setMarketPrices] = useState({}); 
 
   const [deleteModal, setDeleteModal] = useState({ show: false, message: '', onConfirm: null });
+  const [newEmail, setNewEmail] = useState('');
 
   useEffect(() => {
     document.title = "InvestPartner - 投資管理";
   }, []);
 
-  // --- 監聽登入狀態 ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -75,7 +71,6 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // --- 登入與登出函式 ---
   const handleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
@@ -94,10 +89,8 @@ export default function App() {
     }
   };
 
-  // --- 安全顯示金額輔助函式 ---
-  // 如果未登入，顯示隱藏符號
   const secureMoney = (amount) => {
-    if (!user) return "****";
+    if (!isAllowed) return "****";
     return formatMoney(amount);
   };
 
@@ -114,8 +107,15 @@ export default function App() {
     });
 
     const unsubPrices = onSnapshot(doc(db, "settings", "market_prices"), (doc) => {
-      if (doc.exists()) {
-        setMarketPrices(doc.data());
+      if (doc.exists()) { setMarketPrices(doc.data()); }
+    });
+
+    const unsubAccess = onSnapshot(doc(db, "settings", "access"), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setAllowedEmails(data.emails || []);
+      } else {
+        setAllowedEmails([]);
       }
     });
 
@@ -123,8 +123,36 @@ export default function App() {
       unsubFunds();
       unsubTrades();
       unsubPrices();
+      unsubAccess();
     };
   }, []);
+
+  // --- 權限管理功能 ---
+  const handleAddEmail = async (e) => {
+    e.preventDefault();
+    if (!newEmail || !isAdmin) return;
+    try {
+      const docRef = doc(db, "settings", "access");
+      await setDoc(docRef, { emails: arrayUnion(newEmail) }, { merge: true });
+      setNewEmail('');
+      alert(`已新增 ${newEmail} 到允許名單`);
+    } catch (error) {
+      console.error("Error updating access list:", error);
+      alert("更新失敗");
+    }
+  };
+
+  const handleRemoveEmail = async (emailToRemove) => {
+    if (!isAdmin) return;
+    if (!window.confirm(`確定要移除 ${emailToRemove} 的權限嗎？`)) return;
+    try {
+      const docRef = doc(db, "settings", "access");
+      await updateDoc(docRef, { emails: arrayRemove(emailToRemove) });
+    } catch (error) {
+      console.error("Error removing email:", error);
+    }
+  };
+
 
   // --- 計算邏輯 ---
   const capitalStats = useMemo(() => {
@@ -194,14 +222,72 @@ export default function App() {
   const totalPL = totalAssets - capitalStats.totalCapital;
   const totalROI = capitalStats.totalCapital > 0 ? (totalPL / capitalStats.totalCapital) : 0;
 
+  // --- 3. 準備圓餅圖資料 ---
+  const allocationData = useMemo(() => {
+    const data = [
+      { name: '現金 (TWD)', value: portfolioStats.cashBalance },
+      ...portfolioStats.holdingsList.map(h => ({
+        name: h.ticker,
+        value: h.currentValue
+      }))
+    ];
+    // 只顯示價值大於 0 的項目，避免圖表出錯
+    return data.filter(d => d.value > 0);
+  }, [portfolioStats]);
+
   // --- 視圖組件 ---
 
   const Dashboard = () => (
     <div className="space-y-6">
-      {!user && (
+      {!user ? (
         <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex items-center">
           <Lock className="w-5 h-5 mr-2" />
           <span>請登入以查看財務數據</span>
+        </div>
+      ) : !isAllowed ? (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center">
+          <ShieldAlert className="w-5 h-5 mr-2" />
+          <span>您的帳號 ({user.email}) 未在授權名單中。請聯繫管理員 ({ADMIN_EMAIL}) 開通權限。</span>
+        </div>
+      ) : null}
+
+      {isAdmin && (
+        <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg">
+          <div className="flex items-center mb-3">
+            <Settings className="w-5 h-5 mr-2" />
+            <h3 className="font-bold">成員權限管理</h3>
+          </div>
+          <div className="mb-4">
+            <form onSubmit={handleAddEmail} className="flex gap-2">
+              <input 
+                type="email" 
+                placeholder="輸入合夥人 Email (例如: yi@gmail.com)" 
+                value={newEmail}
+                onChange={e => setNewEmail(e.target.value)}
+                className="flex-1 p-2 rounded text-slate-900 outline-none"
+                required
+              />
+              <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold transition-colors">
+                新增
+              </button>
+            </form>
+          </div>
+          <div className="space-y-2">
+            <div className="text-xs text-slate-400 mb-1">目前允許名單：</div>
+            <div className="flex flex-wrap gap-2">
+              <span className="bg-slate-700 px-3 py-1 rounded-full text-sm flex items-center border border-slate-600">
+                {ADMIN_EMAIL} (管理員)
+              </span>
+              {allowedEmails.map(email => (
+                <span key={email} className="bg-slate-700 px-3 py-1 rounded-full text-sm flex items-center border border-slate-600 group">
+                  {email}
+                  <button onClick={() => handleRemoveEmail(email)} className="ml-2 text-slate-400 hover:text-red-400">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       )}
       
@@ -217,15 +303,15 @@ export default function App() {
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
           <div className="text-slate-500 text-sm font-medium mb-1">總損益</div>
-          <div className={`text-2xl font-bold ${!user ? 'text-slate-800' : (totalPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
-            {user && (totalPL >= 0 ? '+' : '')}{secureMoney(totalPL)}
+          <div className={`text-2xl font-bold ${!isAllowed ? 'text-slate-800' : (totalPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+            {isAllowed && (totalPL >= 0 ? '+' : '')}{secureMoney(totalPL)}
           </div>
         </div>
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
           <div className="text-slate-500 text-sm font-medium mb-1">投資報酬率 (ROI)</div>
-          <div className={`text-2xl font-bold ${!user ? 'text-slate-800' : (totalROI >= 0 ? 'text-green-600' : 'text-red-600')}`}>
-            {user && (totalROI >= 0 ? <ArrowUpRight className="inline w-6 h-6 mr-1" /> : <ArrowDownRight className="inline w-6 h-6 mr-1" />)}
-            {user ? formatPercent(totalROI) : "****"}
+          <div className={`text-2xl font-bold ${!isAllowed ? 'text-slate-800' : (totalROI >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+            {isAllowed && (totalROI >= 0 ? <ArrowUpRight className="inline w-6 h-6 mr-1" /> : <ArrowDownRight className="inline w-6 h-6 mr-1" />)}
+            {isAllowed ? formatPercent(totalROI) : "****"}
           </div>
         </div>
       </div>
@@ -258,10 +344,10 @@ export default function App() {
                     <tr key={inv} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
                       <td className="py-4 font-medium text-slate-800">{inv}</td>
                       <td className="py-4">{secureMoney(invested)}</td>
-                      <td className="py-4 text-slate-500">{user ? formatPercent(ratio) : "****"}</td>
+                      <td className="py-4 text-slate-500">{isAllowed ? formatPercent(ratio) : "****"}</td>
                       <td className="py-4 font-bold text-blue-600">{secureMoney(currentValue)}</td>
-                      <td className={`py-4 ${!user ? 'text-slate-600' : (pl >= 0 ? 'text-green-600' : 'text-red-600')}`}>
-                        {user && (pl >= 0 ? '+' : '')}{secureMoney(pl)}
+                      <td className={`py-4 ${!isAllowed ? 'text-slate-600' : (pl >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+                        {isAllowed && (pl >= 0 ? '+' : '')}{secureMoney(pl)}
                       </td>
                     </tr>
                   );
@@ -312,7 +398,6 @@ export default function App() {
 
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 新增資金表單 - 只有管理員看得到 */}
         {isAdmin ? (
           <div className="lg:col-span-1">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
@@ -347,7 +432,6 @@ export default function App() {
            </div>
         )}
 
-        {/* 資金列表 */}
         <div className="lg:col-span-2">
           <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-4 border-b border-slate-100 bg-slate-50">
@@ -431,7 +515,6 @@ export default function App() {
 
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 新增交易表單 - 只有管理員看得到 */}
         {isAdmin ? (
           <div className="lg:col-span-1">
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
@@ -466,7 +549,6 @@ export default function App() {
            </div>
         )}
 
-        {/* 交易列表 */}
         <div className="lg:col-span-2">
            <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-4 border-b border-slate-100 bg-slate-50">
@@ -536,6 +618,42 @@ export default function App() {
 
     return (
       <div className="space-y-6">
+        {/* 4. 顯示圓餅圖分析 */}
+        {isAllowed && (
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+             <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center">
+               <PieChartIcon className="w-5 h-5 mr-2" />
+               資產配置分析
+             </h3>
+             <div className="h-[300px] w-full flex items-center justify-center">
+                {allocationData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={allocationData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        fill="#8884d8"
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {allocationData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => formatMoney(value)} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <p className="text-slate-400">目前無資產數據</p>
+                )}
+             </div>
+          </div>
+        )}
+
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
@@ -583,11 +701,11 @@ export default function App() {
                       />
                     </td>
                     <td className="py-4 text-right font-medium text-slate-800">{secureMoney(item.currentValue)}</td>
-                    <td className={`py-4 text-right font-medium ${!user ? 'text-slate-600' : (item.unrealizedPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
-                      {user && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}
+                    <td className={`py-4 text-right font-medium ${!isAllowed ? 'text-slate-600' : (item.unrealizedPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+                      {isAllowed && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}
                     </td>
-                    <td className={`py-4 text-right pr-4 font-bold ${!user ? 'text-slate-600' : (item.returnRate >= 0 ? 'text-green-600' : 'text-red-600')}`}>
-                      {user ? formatPercent(item.returnRate) : "****"}
+                    <td className={`py-4 text-right pr-4 font-bold ${!isAllowed ? 'text-slate-600' : (item.returnRate >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+                      {isAllowed ? formatPercent(item.returnRate) : "****"}
                     </td>
                   </tr>
                 ))}
@@ -624,10 +742,9 @@ export default function App() {
           <NavButton active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} icon={<LayoutDashboard />} label="總覽儀表板" />
           <NavButton active={activeTab === 'funds'} onClick={() => setActiveTab('funds')} icon={<Wallet />} label="資金管理" />
           <NavButton active={activeTab === 'trade'} onClick={() => setActiveTab('trade')} icon={<TrendingUp />} label="交易紀錄" />
-          <NavButton active={activeTab === 'portfolio'} onClick={() => setActiveTab('portfolio')} icon={<PieChart />} label="持倉與市價" />
+          <NavButton active={activeTab === 'portfolio'} onClick={() => setActiveTab('portfolio')} icon={<PieChartIcon />} label="持倉與市價" />
         </div>
 
-        {/* 1. 移除了「本地儲存」文字，改為登入區塊 */}
         <div className="hidden md:block p-4 border-t border-slate-100">
           {user ? (
              <div className="space-y-3">
@@ -637,7 +754,13 @@ export default function App() {
                  </div>
                  <div className="truncate max-w-[120px]">{user.displayName || '已登入'}</div>
                </div>
-               {isAdmin && <div className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded w-fit">管理員權限</div>}
+               {isAdmin ? (
+                 <div className="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded w-fit">管理員權限</div>
+               ) : !isAllowed ? (
+                 <div className="text-[10px] bg-red-100 text-red-700 px-2 py-1 rounded w-fit">訪客權限 (無數據)</div>
+               ) : (
+                 <div className="text-[10px] bg-blue-100 text-blue-700 px-2 py-1 rounded w-fit">合夥人權限</div>
+               )}
                <button onClick={handleLogout} className="flex items-center text-xs text-red-500 hover:text-red-700 font-medium">
                  <LogOut className="w-3 h-3 mr-1" /> 登出
                </button>
@@ -653,7 +776,7 @@ export default function App() {
         </div>
       </nav>
 
-      {/* 手機版登入按鈕 (顯示在右上角) */}
+      {/* 手機版登入按鈕 */}
       <div className="md:hidden fixed top-4 right-4 z-[60]">
          {user ? (
             <button onClick={handleLogout} className="bg-white p-2 rounded-full shadow-md text-slate-600"><LogOut className="w-5 h-5" /></button>
