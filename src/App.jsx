@@ -20,14 +20,14 @@ import {
   Lock
 } from 'lucide-react';
 
-// --- Firebase 設定 ---
 const firebaseConfig = {
-  apiKey: "請替換您的apiKey",
-  authDomain: "請替換您的authDomain",
-  projectId: "請替換您的projectId",
-  storageBucket: "請替換您的storageBucket",
-  messagingSenderId: "請替換您的messagingSenderId",
-  appId: "請替換您的appId"
+  apiKey: "AIzaSyAXq_gDK2tr-g-Ak9H0_CBOQtO1PLhNKO8",
+  authDomain: "investpartner-eec26.firebaseapp.com",
+  projectId: "investpartner-eec26",
+  storageBucket: "investpartner-eec26.firebasestorage.app",
+  messagingSenderId: "877215963930",
+  appId: "1:877215963930:web:e50cf7b8bdbf708d59eaa3",
+  measurementId: "G-EWSHSTMNSD"
 };
 
 // 初始化 Firebase
