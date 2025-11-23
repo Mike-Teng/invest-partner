@@ -29,6 +29,14 @@ const auth = getAuth(app);
 // --- 【權限設定區域】 ---
 const ADMIN_EMAIL = "m88215@gmail.com"; 
 
+// 【新增】合夥人 Email 對應表
+// 請在此填入合夥人的 Email，對應到資金紀錄中的名字 (Yi, Ma)
+// 這樣當他們登入時，儀表板上方就只會顯示他們自己的績效
+const INVESTOR_MAP = {
+  "yi.990131@gmail.com": "Yi", // 請將 yi.example@gmail.com 改為 Yi 的真實 Email
+  "martinyu929@gmail.com": "Ma"  // 請將 ma.example@gmail.com 改為 Ma 的真實 Email
+};
+
 // --- 圖表顏色配置 (藍, 綠, 黃, 紅, 紫, 粉, 靛) ---
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
 
@@ -237,128 +245,162 @@ export default function App() {
 
   // --- 視圖組件 ---
 
-  const Dashboard = () => (
-    <div className="space-y-6">
-      {!user ? (
-        <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex items-center">
-          <Lock className="w-5 h-5 mr-2" />
-          <span>請登入以查看財務數據</span>
-        </div>
-      ) : !isAllowed ? (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center">
-          <ShieldAlert className="w-5 h-5 mr-2" />
-          <span>您的帳號 ({user.email}) 未在授權名單中。請聯繫管理員 ({ADMIN_EMAIL}) 開通權限。</span>
-        </div>
-      ) : null}
+  const Dashboard = () => {
+    // --- 個人化視圖邏輯 ---
+    // 1. 判斷目前登入者是否為特定投資人
+    const currentInvestorName = user ? INVESTOR_MAP[user.email] : null;
+    const isSpecificInvestor = !isAdmin && currentInvestorName;
 
-      {isAdmin && (
-        <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg">
-          <div className="flex items-center mb-3">
-            <Settings className="w-5 h-5 mr-2" />
-            <h3 className="font-bold">成員權限管理</h3>
+    // 2. 計算要顯示的數據 (如果是管理員顯示總數，如果是合夥人顯示個人數據)
+    let displayAssets = totalAssets;
+    let displayCapital = capitalStats.totalCapital;
+    let displayPL = totalPL;
+    let displayROI = totalROI;
+    let titlePrefix = "總";
+
+    if (isSpecificInvestor) {
+       const invested = capitalStats.investorContributions[currentInvestorName] || 0;
+       const ratio = capitalStats.totalCapital > 0 ? (invested / capitalStats.totalCapital) : 0;
+       
+       displayAssets = totalAssets * ratio;
+       displayCapital = invested;
+       displayPL = displayAssets - displayCapital;
+       displayROI = displayCapital > 0 ? (displayPL / displayCapital) : 0;
+       titlePrefix = "我的";
+    }
+
+    return (
+      <div className="space-y-6">
+        {!user ? (
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-xl flex items-center">
+            <Lock className="w-5 h-5 mr-2" />
+            <span>請登入以查看財務數據</span>
           </div>
-          <div className="mb-4">
-            <form onSubmit={handleAddEmail} className="flex gap-2">
-              <input 
-                type="email" 
-                placeholder="輸入合夥人 Email (例如: yi@gmail.com)" 
-                value={newEmail}
-                onChange={e => setNewEmail(e.target.value)}
-                className="flex-1 p-2 rounded text-slate-900 outline-none"
-                required
-              />
-              <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold transition-colors">
-                新增
-              </button>
-            </form>
+        ) : !isAllowed ? (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl flex items-center">
+            <ShieldAlert className="w-5 h-5 mr-2" />
+            <span>您的帳號 ({user.email}) 未在授權名單中。請聯繫管理員 ({ADMIN_EMAIL}) 開通權限。</span>
           </div>
-          <div className="space-y-2">
-            <div className="text-xs text-slate-400 mb-1">目前允許名單：</div>
-            <div className="flex flex-wrap gap-2">
-              <span className="bg-slate-700 px-3 py-1 rounded-full text-sm flex items-center border border-slate-600">
-                {ADMIN_EMAIL} (管理員)
-              </span>
-              {allowedEmails.map(email => (
-                <span key={email} className="bg-slate-700 px-3 py-1 rounded-full text-sm flex items-center border border-slate-600 group">
-                  {email}
-                  <button onClick={() => handleRemoveEmail(email)} className="ml-2 text-slate-400 hover:text-red-400">
-                    <X className="w-3 h-3" />
-                  </button>
+        ) : null}
+
+        {isAdmin && (
+          <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg">
+            <div className="flex items-center mb-3">
+              <Settings className="w-5 h-5 mr-2" />
+              <h3 className="font-bold">成員權限管理</h3>
+            </div>
+            <div className="mb-4">
+              <form onSubmit={handleAddEmail} className="flex gap-2">
+                <input 
+                  type="email" 
+                  placeholder="輸入合夥人 Email" 
+                  value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)}
+                  className="flex-1 p-2 rounded text-slate-900 outline-none"
+                  required
+                />
+                <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold transition-colors">
+                  新增
+                </button>
+              </form>
+            </div>
+            <div className="space-y-2">
+              <div className="text-xs text-slate-400 mb-1">目前允許名單：</div>
+              <div className="flex flex-wrap gap-2">
+                <span className="bg-slate-700 px-3 py-1 rounded-full text-sm flex items-center border border-slate-600">
+                  {ADMIN_EMAIL} (管理員)
                 </span>
-              ))}
+                {allowedEmails.map(email => (
+                  <span key={email} className="bg-slate-700 px-3 py-1 rounded-full text-sm flex items-center border border-slate-600 group">
+                    {email}
+                    <button onClick={() => handleRemoveEmail(email)} className="ml-2 text-slate-400 hover:text-red-400">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* 儀表板卡片：根據身分顯示不同數據 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <div className="text-slate-500 text-sm font-medium mb-1">{titlePrefix}資產 (NAV)</div>
+            <div className="text-3xl font-bold text-slate-800">{secureMoney(displayAssets)}</div>
+            <div className="text-xs text-slate-400 mt-2">
+              {isSpecificInvestor ? "依資金比例計算之權益" : "現金 + 股票市值"}
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <div className="text-slate-500 text-sm font-medium mb-1">{titlePrefix}投入本金</div>
+            <div className="text-2xl font-bold text-slate-800">{secureMoney(displayCapital)}</div>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <div className="text-slate-500 text-sm font-medium mb-1">{titlePrefix}損益</div>
+            <div className={`text-2xl font-bold ${!isAllowed ? 'text-slate-800' : (displayPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+              {isAllowed && (displayPL >= 0 ? '+' : '')}{secureMoney(displayPL)}
+            </div>
+          </div>
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <div className="text-slate-500 text-sm font-medium mb-1">投資報酬率 (ROI)</div>
+            <div className={`text-2xl font-bold ${!isAllowed ? 'text-slate-800' : (displayROI >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+              {isAllowed && (displayROI >= 0 ? <ArrowUpRight className="inline w-6 h-6 mr-1" /> : <ArrowDownRight className="inline w-6 h-6 mr-1" />)}
+              {isAllowed ? formatPercent(displayROI) : "****"}
             </div>
           </div>
         </div>
-      )}
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <div className="text-slate-500 text-sm font-medium mb-1">總資產 (NAV)</div>
-          <div className="text-3xl font-bold text-slate-800">{secureMoney(totalAssets)}</div>
-          <div className="text-xs text-slate-400 mt-2">現金 + 股票市值</div>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <div className="text-slate-500 text-sm font-medium mb-1">總投入本金</div>
-          <div className="text-2xl font-bold text-slate-800">{secureMoney(capitalStats.totalCapital)}</div>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <div className="text-slate-500 text-sm font-medium mb-1">總損益</div>
-          <div className={`text-2xl font-bold ${!isAllowed ? 'text-slate-800' : (totalPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
-            {isAllowed && (totalPL >= 0 ? '+' : '')}{secureMoney(totalPL)}
+
+        {/* 合夥人權益分配表 (維持顯示全部，公開透明) */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center">
+            <Users className="w-5 h-5 text-slate-500 mr-2" />
+            <h3 className="font-bold text-slate-700">合夥人權益分配表</h3>
           </div>
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <div className="text-slate-500 text-sm font-medium mb-1">投資報酬率 (ROI)</div>
-          <div className={`text-2xl font-bold ${!isAllowed ? 'text-slate-800' : (totalROI >= 0 ? 'text-green-600' : 'text-red-600')}`}>
-            {isAllowed && (totalROI >= 0 ? <ArrowUpRight className="inline w-6 h-6 mr-1" /> : <ArrowDownRight className="inline w-6 h-6 mr-1" />)}
-            {isAllowed ? formatPercent(totalROI) : "****"}
+          <div className="p-6">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="text-slate-400 text-sm border-b border-slate-100">
+                    <th className="pb-3 font-medium whitespace-nowrap">投資人</th>
+                    <th className="pb-3 font-medium whitespace-nowrap">投入本金</th>
+                    <th className="pb-3 font-medium whitespace-nowrap">佔比</th>
+                    <th className="pb-3 font-medium whitespace-nowrap">當前淨值</th>
+                    <th className="pb-3 font-medium whitespace-nowrap">個人損益</th>
+                  </tr>
+                </thead>
+                <tbody className="text-slate-600">
+                  {investors.map(inv => {
+                    const invested = capitalStats.investorContributions[inv] || 0;
+                    const ratio = capitalStats.totalCapital > 0 ? (invested / capitalStats.totalCapital) : 0;
+                    const currentValue = totalAssets * ratio;
+                    const pl = currentValue - invested;
+                    // 高亮顯示自己
+                    const isMe = inv === currentInvestorName;
+
+                    return (
+                      <tr key={inv} className={`border-b border-slate-50 last:border-0 transition-colors ${isMe ? 'bg-blue-50/60' : 'hover:bg-slate-50'}`}>
+                        <td className="py-4 font-medium text-slate-800 whitespace-nowrap flex items-center">
+                          {inv}
+                          {isMe && <span className="ml-2 text-[10px] bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded font-bold">ME</span>}
+                        </td>
+                        <td className="py-4 whitespace-nowrap">{secureMoney(invested)}</td>
+                        <td className="py-4 text-slate-500 whitespace-nowrap">{isAllowed ? formatPercent(ratio) : "****"}</td>
+                        <td className="py-4 font-bold text-blue-600 whitespace-nowrap">{secureMoney(currentValue)}</td>
+                        <td className={`py-4 whitespace-nowrap ${!isAllowed ? 'text-slate-600' : (pl >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+                          {isAllowed && (pl >= 0 ? '+' : '')}{secureMoney(pl)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
-
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center">
-          <Users className="w-5 h-5 text-slate-500 mr-2" />
-          <h3 className="font-bold text-slate-700">合夥人權益分配</h3>
-        </div>
-        <div className="p-6">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-slate-400 text-sm border-b border-slate-100">
-                  <th className="pb-3 font-medium whitespace-nowrap">投資人</th>
-                  <th className="pb-3 font-medium whitespace-nowrap">投入本金</th>
-                  <th className="pb-3 font-medium whitespace-nowrap">佔比</th>
-                  <th className="pb-3 font-medium whitespace-nowrap">當前淨值</th>
-                  <th className="pb-3 font-medium whitespace-nowrap">個人損益</th>
-                </tr>
-              </thead>
-              <tbody className="text-slate-600">
-                {investors.map(inv => {
-                  const invested = capitalStats.investorContributions[inv] || 0;
-                  const ratio = capitalStats.totalCapital > 0 ? (invested / capitalStats.totalCapital) : 0;
-                  const currentValue = totalAssets * ratio;
-                  const pl = currentValue - invested;
-
-                  return (
-                    <tr key={inv} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
-                      <td className="py-4 font-medium text-slate-800 whitespace-nowrap">{inv}</td>
-                      <td className="py-4 whitespace-nowrap">{secureMoney(invested)}</td>
-                      <td className="py-4 text-slate-500 whitespace-nowrap">{isAllowed ? formatPercent(ratio) : "****"}</td>
-                      <td className="py-4 font-bold text-blue-600 whitespace-nowrap">{secureMoney(currentValue)}</td>
-                      <td className={`py-4 whitespace-nowrap ${!isAllowed ? 'text-slate-600' : (pl >= 0 ? 'text-green-600' : 'text-red-600')}`}>
-                        {isAllowed && (pl >= 0 ? '+' : '')}{secureMoney(pl)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const FundManager = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
