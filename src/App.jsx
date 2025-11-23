@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove, query, orderBy, getDocs, writeBatch } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
-// 1. 引入 Recharts 圖表套件
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-// 2. 將原本的 PieChart 圖示改名為 PieChartIcon，避免跟圖表組件名稱衝突
+// 1. 引入 Recharts 圖表套件 (新增 LineChart 等組件)
+import { 
+  PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
+  LineChart, Line, XAxis, YAxis, CartesianGrid
+} from 'recharts';
 import { 
   LayoutDashboard, Wallet, TrendingUp, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, 
-  Trash2, Plus, Save, Users, AlertCircle, LogIn, LogOut, Lock, ShieldAlert, Settings, X
+  Trash2, Plus, Save, Users, AlertCircle, LogIn, LogOut, Lock, ShieldAlert, Settings, X,
+  LineChart as LineChartIcon, RefreshCw
 } from 'lucide-react';
 
 // --- Firebase 設定 ---
@@ -29,13 +32,13 @@ const auth = getAuth(app);
 // --- 【權限設定區域】 ---
 const ADMIN_EMAIL = "m88215@gmail.com"; 
 
-// --- 投資人 Email 對應表 ---
+// 合夥人 Email 對應表
 const INVESTOR_MAP = {
-  "yi.990131@gmail.com": "Yi", // 請將 yi.example@gmail.com 改為 Yi 的真實 Email
-  "martinyu929@gmail.com": "Ma"  // 請將 ma.example@gmail.com 改為 Ma 的真實 Email
+  "yi.990131@gmail.com": "Yi",
+  "martinyu929@gmail.com": "Ma"
 };
 
-// --- 圖表顏色配置 (藍, 綠, 黃, 紅, 紫, 粉, 靛) ---
+// --- 圖表顏色配置 ---
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
 
 // --- 輔助函數 ---
@@ -45,6 +48,12 @@ const formatMoney = (amount) => {
 
 const formatPercent = (value) => {
   return `${(value * 100).toFixed(2)}%`;
+};
+
+// 日期格式化 (MM/DD)
+const formatDateShort = (dateStr) => {
+  const date = new Date(dateStr);
+  return `${date.getMonth() + 1}/${date.getDate()}`;
 };
 
 export default function App() {
@@ -61,7 +70,8 @@ export default function App() {
   
   const [funds, setFunds] = useState([]);
   const [trades, setTrades] = useState([]);
-  const [marketPrices, setMarketPrices] = useState({}); 
+  const [marketPrices, setMarketPrices] = useState({});
+  const [historyData, setHistoryData] = useState([]); // 資產歷史數據
 
   const [deleteModal, setDeleteModal] = useState({ show: false, message: '', onConfirm: null });
   const [newEmail, setNewEmail] = useState('');
@@ -102,20 +112,24 @@ export default function App() {
 
   // --- Firebase 監聽資料 ---
   useEffect(() => {
+    // 1. 資金
     const unsubFunds = onSnapshot(collection(db, "funds"), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setFunds(data);
     });
 
+    // 2. 交易
     const unsubTrades = onSnapshot(collection(db, "trades"), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTrades(data);
     });
 
+    // 3. 市價
     const unsubPrices = onSnapshot(doc(db, "settings", "market_prices"), (doc) => {
       if (doc.exists()) { setMarketPrices(doc.data()); }
     });
 
+    // 4. 權限名單
     const unsubAccess = onSnapshot(doc(db, "settings", "access"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -125,11 +139,19 @@ export default function App() {
       }
     });
 
+    // 5. 【新功能】監聽資產歷史 (用於折線圖)
+    const qHistory = query(collection(db, "asset_history"), orderBy("timestamp", "asc"));
+    const unsubHistory = onSnapshot(qHistory, (snapshot) => {
+      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setHistoryData(data);
+    });
+
     return () => {
       unsubFunds();
       unsubTrades();
       unsubPrices();
       unsubAccess();
+      unsubHistory();
     };
   }, []);
 
@@ -228,7 +250,7 @@ export default function App() {
   const totalPL = totalAssets - capitalStats.totalCapital;
   const totalROI = capitalStats.totalCapital > 0 ? (totalPL / capitalStats.totalCapital) : 0;
 
-  // --- 3. 準備圓餅圖資料 ---
+  // 3. 準備圓餅圖資料
   const allocationData = useMemo(() => {
     const data = [
       { name: '現金 (TWD)', value: portfolioStats.cashBalance },
@@ -237,19 +259,64 @@ export default function App() {
         value: h.currentValue
       }))
     ];
-    // 只顯示價值大於 0 的項目，避免圖表出錯
     return data.filter(d => d.value > 0);
   }, [portfolioStats]);
+
+  // --- 【新功能】記錄歷史快照 ---
+  const handleRecordHistory = async () => {
+    if (!isAdmin) return;
+    if (!window.confirm("確定要記錄當下的資產總值到歷史趨勢圖嗎？")) return;
+
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      // 計算每個人的當前權益
+      const userValues = {};
+      investors.forEach(inv => {
+        const invested = capitalStats.investorContributions[inv] || 0;
+        const ratio = capitalStats.totalCapital > 0 ? (invested / capitalStats.totalCapital) : 0;
+        userValues[inv] = totalAssets * ratio;
+      });
+
+      await addDoc(collection(db, "asset_history"), {
+        date: today,
+        timestamp: Date.now(),
+        total: totalAssets,
+        ...userValues // 儲存每個人的值: { Yi: 1000, Ma: 2000 }
+      });
+      alert("已成功記錄今日資產快照！");
+    } catch (error) {
+      console.error("Error recording history:", error);
+      alert("記錄失敗");
+    }
+  };
+
+  // --- 【新功能】清除所有歷史數據 (測試用) ---
+  const handleClearHistory = async () => {
+    if (!isAdmin) return;
+    if (!window.confirm("警告：確定要清除「所有」歷史折線圖數據嗎？此操作無法復原。")) return;
+
+    try {
+      // Firestore 需要一筆筆刪除
+      const querySnapshot = await getDocs(collection(db, "asset_history"));
+      const batch = writeBatch(db);
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      alert("歷史數據已清空");
+    } catch (error) {
+      console.error("Error clearing history:", error);
+      alert("清除失敗");
+    }
+  };
 
   // --- 視圖組件 ---
 
   const Dashboard = () => {
     // --- 個人化視圖邏輯 ---
-    // 1. 判斷目前登入者是否為特定投資人
     const currentInvestorName = user ? INVESTOR_MAP[user.email] : null;
     const isSpecificInvestor = !isAdmin && currentInvestorName;
 
-    // 2. 計算要顯示的數據 (如果是管理員顯示總數，如果是合夥人顯示個人數據)
     let displayAssets = totalAssets;
     let displayCapital = capitalStats.totalCapital;
     let displayPL = totalPL;
@@ -282,46 +349,122 @@ export default function App() {
         ) : null}
 
         {isAdmin && (
-          <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg">
-            <div className="flex items-center mb-3">
-              <Settings className="w-5 h-5 mr-2" />
-              <h3 className="font-bold">成員權限管理</h3>
-            </div>
-            <div className="mb-4">
-              <form onSubmit={handleAddEmail} className="flex gap-2">
-                <input 
-                  type="email" 
-                  placeholder="輸入合夥人 Email" 
-                  value={newEmail}
-                  onChange={e => setNewEmail(e.target.value)}
-                  className="flex-1 p-2 rounded text-slate-900 outline-none"
-                  required
-                />
-                <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold transition-colors">
-                  新增
-                </button>
-              </form>
-            </div>
-            <div className="space-y-2">
-              <div className="text-xs text-slate-400 mb-1">目前允許名單：</div>
-              <div className="flex flex-wrap gap-2">
-                <span className="bg-slate-700 px-3 py-1 rounded-full text-sm flex items-center border border-slate-600">
-                  {ADMIN_EMAIL} (管理員)
-                </span>
-                {allowedEmails.map(email => (
-                  <span key={email} className="bg-slate-700 px-3 py-1 rounded-full text-sm flex items-center border border-slate-600 group">
-                    {email}
-                    <button onClick={() => handleRemoveEmail(email)} className="ml-2 text-slate-400 hover:text-red-400">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </span>
-                ))}
+          <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg space-y-6">
+            {/* 權限管理區塊 */}
+            <div>
+              <div className="flex items-center mb-3">
+                <Settings className="w-5 h-5 mr-2" />
+                <h3 className="font-bold">成員權限管理</h3>
               </div>
+              <div className="mb-4">
+                <form onSubmit={handleAddEmail} className="flex gap-2">
+                  <input 
+                    type="email" 
+                    placeholder="輸入合夥人 Email" 
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value)}
+                    className="flex-1 p-2 rounded text-slate-900 outline-none"
+                    required
+                  />
+                  <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded font-bold transition-colors">
+                    新增
+                  </button>
+                </form>
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs text-slate-400 mb-1">目前允許名單：</div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="bg-slate-700 px-3 py-1 rounded-full text-sm flex items-center border border-slate-600">
+                    {ADMIN_EMAIL} (管理員)
+                  </span>
+                  {allowedEmails.map(email => (
+                    <span key={email} className="bg-slate-700 px-3 py-1 rounded-full text-sm flex items-center border border-slate-600 group">
+                      {email}
+                      <button onClick={() => handleRemoveEmail(email)} className="ml-2 text-slate-400 hover:text-red-400">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-600 my-4"></div>
+
+            {/* 歷史數據管理區塊 (新功能) */}
+            <div>
+              <div className="flex items-center mb-3">
+                <LineChartIcon className="w-5 h-5 mr-2" />
+                <h3 className="font-bold">歷史趨勢圖管理</h3>
+              </div>
+              <div className="flex gap-3">
+                <button 
+                  onClick={handleRecordHistory}
+                  className="flex-1 bg-green-600 hover:bg-green-500 px-4 py-2 rounded font-bold transition-colors flex items-center justify-center"
+                >
+                  <Plus className="w-4 h-4 mr-2" /> 記錄今日快照
+                </button>
+                <button 
+                  onClick={handleClearHistory}
+                  className="flex-1 bg-red-600 hover:bg-red-500 px-4 py-2 rounded font-bold transition-colors flex items-center justify-center"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> 清除歷史數據
+                </button>
+              </div>
+              <p className="text-xs text-slate-400 mt-2">
+                * 請在更新完所有股價後，點擊「記錄今日快照」，折線圖才會出現新的點。
+              </p>
             </div>
           </div>
         )}
         
-        {/* 儀表板卡片：根據身分顯示不同數據 */}
+        {/* 1. 資產趨勢折線圖 */}
+        {isAllowed && historyData.length > 0 && (
+          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+            <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center">
+              <LineChartIcon className="w-5 h-5 mr-2" />
+              資產成長趨勢
+            </h3>
+            <div className="h-[250px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={historyData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis 
+                    dataKey="date" 
+                    tickFormatter={formatDateShort} 
+                    tick={{fontSize: 12, fill: '#94a3b8'}}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis 
+                    tickFormatter={(val) => `$${val/1000}k`}
+                    tick={{fontSize: 12, fill: '#94a3b8'}}
+                    axisLine={false}
+                    tickLine={false}
+                    domain={['auto', 'auto']}
+                  />
+                  <Tooltip 
+                    formatter={(value) => [formatMoney(value), "資產"]}
+                    labelFormatter={(label) => `日期: ${label}`}
+                  />
+                  <Legend />
+                  {/* 如果是管理員，顯示 Total；如果是合夥人，顯示自己的名字 */}
+                  <Line 
+                    type="monotone" 
+                    dataKey={isSpecificInvestor ? currentInvestorName : "total"} 
+                    name={isSpecificInvestor ? "我的資產" : "總資產"}
+                    stroke="#3b82f6" 
+                    strokeWidth={3}
+                    dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
+
+        {/* 2. 儀表板卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
             <div className="text-slate-500 text-sm font-medium mb-1">{titlePrefix}資產 (NAV)</div>
@@ -349,7 +492,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* 合夥人權益分配表 (維持顯示全部，公開透明) */}
+        {/* 3. 合夥人權益分配表 */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center">
             <Users className="w-5 h-5 text-slate-500 mr-2" />
@@ -400,6 +543,8 @@ export default function App() {
     );
   };
 
+  // ... 其餘 FundManager, TradeManager, Portfolio 維持不變 ...
+  
   const FundManager = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [investor, setInvestor] = useState(investors[0]);
@@ -658,7 +803,6 @@ export default function App() {
 
     return (
       <div className="space-y-6">
-        {/* 4. 顯示圓餅圖分析 */}
         {isAllowed && (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
              <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center">
@@ -772,7 +916,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900">
-      {/* 修正 1: 在 mobile 模式增加 pb-2，將按鈕往上推，避免被手機下方 Home Bar 切到 */}
       <nav className="fixed bottom-0 w-full bg-white border-t border-slate-200 md:w-64 md:h-full md:border-t-0 md:border-r md:left-0 z-50 flex md:flex-col justify-between md:justify-start pb-2 md:pb-0">
         <div className="hidden md:flex items-center p-6 border-b border-slate-100">
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 text-lg">$</div>
