@@ -29,9 +29,7 @@ const auth = getAuth(app);
 // --- 【權限設定區域】 ---
 const ADMIN_EMAIL = "m88215@gmail.com"; 
 
-// 【新增】合夥人 Email 對應表
-// 請在此填入合夥人的 Email，對應到資金紀錄中的名字 (Yi, Ma)
-// 這樣當他們登入時，儀表板上方就只會顯示他們自己的績效
+// --- 投資人 Email 對應表 ---
 const INVESTOR_MAP = {
   "yi.990131@gmail.com": "Yi", // 請將 yi.example@gmail.com 改為 Yi 的真實 Email
   "martinyu929@gmail.com": "Ma"  // 請將 ma.example@gmail.com 改為 Ma 的真實 Email
