@@ -39,8 +39,18 @@ const INVESTOR_MAP = {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
 
+// --- 輔助函數 ---
 const formatMoney = (amount) => {
   return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(amount);
+};
+
+// 新增：原幣格式化 (美金顯示小數點2位，台幣0位)
+const formatOriginalMoney = (amount, isUS) => {
+  return new Intl.NumberFormat(isUS ? 'en-US' : 'zh-TW', { 
+    style: 'currency', 
+    currency: isUS ? 'USD' : 'TWD', 
+    maximumFractionDigits: isUS ? 2 : 0 
+  }).format(amount);
 };
 
 const formatPercent = (value) => {
@@ -102,6 +112,12 @@ export default function App() {
   const secureMoney = (amount) => {
     if (!isAllowed) return "****";
     return formatMoney(amount);
+  };
+
+  // 新增：原幣安全顯示
+  const secureOriginalMoney = (amount, isUS) => {
+    if (!isAllowed) return "****";
+    return formatOriginalMoney(amount, isUS);
   };
 
   useEffect(() => {
@@ -171,7 +187,7 @@ export default function App() {
 
   // --- 計算邏輯 ---
   
-  // 1. 取得匯率 (如果沒有抓到，預設 1:32.5，避免計算錯誤)
+  // 1. 取得匯率
   const exchangeRate = marketPrices['USDTWD'] || 32.5;
 
   const capitalStats = useMemo(() => {
@@ -190,20 +206,11 @@ export default function App() {
   }, [funds, investors]);
 
   const portfolioStats = useMemo(() => {
-    // 現金餘額 (假設交易紀錄中的 price 都是原幣，但現金扣款要換算成台幣扣掉)
-    // 這裡做一個簡化：
-    // - 買入美股時，視為用台幣換匯後買入 -> 扣除 (USD Price * 匯率 * Qty) 的台幣現金
-    // - 賣出美股時，視為賣出後換回台幣 -> 增加 (USD Price * 匯率 * Qty) 的台幣現金
-    // 注意：這會導致匯率變動時，現金餘額計算可能會與實際帳戶有些微落差，但在記帳邏輯上是通用的「以市值計算」。
-    
     let cashBalance = capitalStats.totalCapital;
     const holdings = {}; 
 
     trades.forEach(t => {
-      // 判斷是否為美股 (英文字母)
       const isUS = /^[A-Z]+$/.test(t.ticker);
-      // 該筆交易當時的金額 (換算回台幣)
-      // 注意：最精確是用「交易當時」匯率，但這裡簡化使用「當前」匯率來估算「佔用資金」
       const rate = isUS ? exchangeRate : 1;
       const totalAmountTWD = parseFloat(t.price) * parseFloat(t.qty) * rate;
       const totalAmountOriginal = parseFloat(t.price) * parseFloat(t.qty);
@@ -212,7 +219,6 @@ export default function App() {
         cashBalance -= totalAmountTWD;
         if (!holdings[t.ticker]) holdings[t.ticker] = { qty: 0, totalCostOriginal: 0, isUS };
         holdings[t.ticker].qty += parseFloat(t.qty);
-        // 成本紀錄原幣
         holdings[t.ticker].totalCostOriginal += totalAmountOriginal;
       } else {
         cashBalance += totalAmountTWD;
@@ -229,19 +235,20 @@ export default function App() {
       const data = holdings[ticker];
       if (data.qty <= 0) return null; 
 
-      // 判斷是否為美股
       const isUS = data.isUS;
       const rate = isUS ? exchangeRate : 1;
 
       // 當前價格 (原幣)
       const currentPriceOriginal = marketPrices[ticker] || (data.totalCostOriginal / data.qty);
       
-      // 當前市值 (台幣) = 股數 * 原幣市價 * 匯率
-      const currentValueTWD = data.qty * currentPriceOriginal * rate;
+      // 當前市值 (原幣)
+      const marketValueOriginal = data.qty * currentPriceOriginal;
+
+      // 當前市值 (台幣)
+      const currentValueTWD = marketValueOriginal * rate;
       marketValue += currentValueTWD;
 
-      // 總成本 (台幣估算) = 原幣總成本 * 匯率
-      // 這裡使用當前匯率將成本轉為台幣，這代表「包含匯差」的損益
+      // 總成本 (台幣估算，用於計算未實現損益)
       const totalCostTWD = data.totalCostOriginal * rate;
 
       const avgCostOriginal = data.totalCostOriginal / data.qty;
@@ -252,9 +259,10 @@ export default function App() {
         ticker,
         isUS,
         qty: data.qty,
-        avgCostOriginal, // 原幣平均成本
-        currentPriceOriginal, // 原幣現價
-        currentValue: currentValueTWD, // 台幣市值
+        avgCostOriginal,
+        currentPriceOriginal,
+        marketValueOriginal, // 原幣市值 (用於顯示)
+        currentValue: currentValueTWD, // 台幣市值 (用於圓餅圖和總資產)
         unrealizedPL, // 台幣損益
         returnRate
       };
@@ -272,7 +280,7 @@ export default function App() {
       { name: '現金 (TWD)', value: portfolioStats.cashBalance },
       ...portfolioStats.holdingsList.map(h => ({
         name: h.ticker,
-        value: h.currentValue
+        value: h.currentValue // 這裡必須用台幣，因為圓餅圖不能混雜幣別
       }))
     ];
     return data.filter(d => d.value > 0);
@@ -553,7 +561,6 @@ export default function App() {
     );
   };
 
-  // ... 其餘 FundManager, TradeManager 維持不變 ...
   const FundManager = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [investor, setInvestor] = useState(investors[0]);
@@ -871,7 +878,7 @@ export default function App() {
                   <th className="pb-3 font-medium text-right whitespace-nowrap">持有股數</th>
                   <th className="pb-3 font-medium text-right whitespace-nowrap">幣別</th>
                   <th className="pb-3 font-medium text-right w-40 whitespace-nowrap">現價(原幣) {isAdmin ? '(可編輯)' : ''}</th>
-                  <th className="pb-3 font-medium text-right whitespace-nowrap">市值(TWD)</th>
+                  <th className="pb-3 font-medium text-right whitespace-nowrap">市值(原幣)</th>
                   <th className="pb-3 font-medium text-right whitespace-nowrap">未實現損益(TWD)</th>
                   <th className="pb-3 font-medium text-right pr-4 whitespace-nowrap">報酬率</th>
                 </tr>
@@ -895,7 +902,11 @@ export default function App() {
                         className={`input-field w-24 text-right ${isAdmin ? 'bg-indigo-50/50 border-indigo-200' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
                       />
                     </td>
-                    <td className="py-4 text-right font-medium text-slate-800 whitespace-nowrap">{secureMoney(item.currentValue)}</td>
+                    {/* 修改：顯示原幣市值 */}
+                    <td className="py-4 text-right font-medium text-slate-800 whitespace-nowrap">
+                      {secureOriginalMoney(item.marketValueOriginal, item.isUS)}
+                    </td>
+                    {/* 維持：顯示台幣損益 */}
                     <td className={`py-4 text-right font-medium whitespace-nowrap ${!isAllowed ? 'text-slate-600' : (item.unrealizedPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
                       {isAllowed && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}
                     </td>
