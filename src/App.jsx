@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove, query, orderBy, getDocs, writeBatch } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
-// 1. 引入 Recharts 圖表套件 (新增 LineChart 等組件)
 import { 
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid
@@ -10,7 +9,7 @@ import {
 import { 
   LayoutDashboard, Wallet, TrendingUp, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, 
   Trash2, Plus, Save, Users, AlertCircle, LogIn, LogOut, Lock, ShieldAlert, Settings, X,
-  LineChart as LineChartIcon, RefreshCw
+  LineChart as LineChartIcon, RefreshCw, DollarSign
 } from 'lucide-react';
 
 // --- Firebase 設定 ---
@@ -38,10 +37,8 @@ const INVESTOR_MAP = {
   "martinyu929@gmail.com": "Ma"
 };
 
-// --- 圖表顏色配置 ---
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
 
-// --- 輔助函數 ---
 const formatMoney = (amount) => {
   return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(amount);
 };
@@ -50,7 +47,6 @@ const formatPercent = (value) => {
   return `${(value * 100).toFixed(2)}%`;
 };
 
-// 日期格式化 (MM/DD)
 const formatDateShort = (dateStr) => {
   const date = new Date(dateStr);
   return `${date.getMonth() + 1}/${date.getDate()}`;
@@ -60,18 +56,16 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [investors] = useState(['Yi', 'Ma']);
   
-  // 使用者狀態
   const [user, setUser] = useState(null);
   const [allowedEmails, setAllowedEmails] = useState([]);
   
-  // --- 權限判斷邏輯 ---
   const isAdmin = user && user.email === ADMIN_EMAIL;
   const isAllowed = user && (allowedEmails.includes(user.email) || isAdmin);
   
   const [funds, setFunds] = useState([]);
   const [trades, setTrades] = useState([]);
   const [marketPrices, setMarketPrices] = useState({});
-  const [historyData, setHistoryData] = useState([]); // 資產歷史數據
+  const [historyData, setHistoryData] = useState([]);
 
   const [deleteModal, setDeleteModal] = useState({ show: false, message: '', onConfirm: null });
   const [newEmail, setNewEmail] = useState('');
@@ -110,26 +104,21 @@ export default function App() {
     return formatMoney(amount);
   };
 
-  // --- Firebase 監聽資料 ---
   useEffect(() => {
-    // 1. 資金
     const unsubFunds = onSnapshot(collection(db, "funds"), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setFunds(data);
     });
 
-    // 2. 交易
     const unsubTrades = onSnapshot(collection(db, "trades"), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setTrades(data);
     });
 
-    // 3. 市價
     const unsubPrices = onSnapshot(doc(db, "settings", "market_prices"), (doc) => {
       if (doc.exists()) { setMarketPrices(doc.data()); }
     });
 
-    // 4. 權限名單
     const unsubAccess = onSnapshot(doc(db, "settings", "access"), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -139,7 +128,6 @@ export default function App() {
       }
     });
 
-    // 5. 【新功能】監聽資產歷史 (用於折線圖)
     const qHistory = query(collection(db, "asset_history"), orderBy("timestamp", "asc"));
     const unsubHistory = onSnapshot(qHistory, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -155,7 +143,7 @@ export default function App() {
     };
   }, []);
 
-  // --- 權限管理功能 ---
+  // --- 權限管理 ---
   const handleAddEmail = async (e) => {
     e.preventDefault();
     if (!newEmail || !isAdmin) return;
@@ -181,8 +169,11 @@ export default function App() {
     }
   };
 
-
   // --- 計算邏輯 ---
+  
+  // 1. 取得匯率 (如果沒有抓到，預設 1:32.5，避免計算錯誤)
+  const exchangeRate = marketPrices['USDTWD'] || 32.5;
+
   const capitalStats = useMemo(() => {
     let totalCapital = 0;
     const investorContributions = {};
@@ -199,22 +190,36 @@ export default function App() {
   }, [funds, investors]);
 
   const portfolioStats = useMemo(() => {
+    // 現金餘額 (假設交易紀錄中的 price 都是原幣，但現金扣款要換算成台幣扣掉)
+    // 這裡做一個簡化：
+    // - 買入美股時，視為用台幣換匯後買入 -> 扣除 (USD Price * 匯率 * Qty) 的台幣現金
+    // - 賣出美股時，視為賣出後換回台幣 -> 增加 (USD Price * 匯率 * Qty) 的台幣現金
+    // 注意：這會導致匯率變動時，現金餘額計算可能會與實際帳戶有些微落差，但在記帳邏輯上是通用的「以市值計算」。
+    
     let cashBalance = capitalStats.totalCapital;
     const holdings = {}; 
 
     trades.forEach(t => {
-      const totalAmount = parseFloat(t.price) * parseFloat(t.qty);
+      // 判斷是否為美股 (英文字母)
+      const isUS = /^[A-Z]+$/.test(t.ticker);
+      // 該筆交易當時的金額 (換算回台幣)
+      // 注意：最精確是用「交易當時」匯率，但這裡簡化使用「當前」匯率來估算「佔用資金」
+      const rate = isUS ? exchangeRate : 1;
+      const totalAmountTWD = parseFloat(t.price) * parseFloat(t.qty) * rate;
+      const totalAmountOriginal = parseFloat(t.price) * parseFloat(t.qty);
+
       if (t.type === 'BUY') {
-        cashBalance -= totalAmount;
-        if (!holdings[t.ticker]) holdings[t.ticker] = { qty: 0, totalCost: 0 };
+        cashBalance -= totalAmountTWD;
+        if (!holdings[t.ticker]) holdings[t.ticker] = { qty: 0, totalCostOriginal: 0, isUS };
         holdings[t.ticker].qty += parseFloat(t.qty);
-        holdings[t.ticker].totalCost += totalAmount;
+        // 成本紀錄原幣
+        holdings[t.ticker].totalCostOriginal += totalAmountOriginal;
       } else {
-        cashBalance += totalAmount;
+        cashBalance += totalAmountTWD;
         if (holdings[t.ticker]) {
-          const avgCost = holdings[t.ticker].totalCost / holdings[t.ticker].qty;
+          const avgCost = holdings[t.ticker].totalCostOriginal / holdings[t.ticker].qty;
           holdings[t.ticker].qty -= parseFloat(t.qty);
-          holdings[t.ticker].totalCost -= avgCost * parseFloat(t.qty);
+          holdings[t.ticker].totalCostOriginal -= avgCost * parseFloat(t.qty);
         }
       }
     });
@@ -224,33 +229,44 @@ export default function App() {
       const data = holdings[ticker];
       if (data.qty <= 0) return null; 
 
-      const currentPrice = marketPrices[ticker] || (data.totalCost / data.qty); 
-      const currentValue = data.qty * currentPrice;
-      marketValue += currentValue;
+      // 判斷是否為美股
+      const isUS = data.isUS;
+      const rate = isUS ? exchangeRate : 1;
 
-      const avgCost = data.totalCost / data.qty;
-      const unrealizedPL = currentValue - data.totalCost;
-      const returnRate = (unrealizedPL / data.totalCost);
+      // 當前價格 (原幣)
+      const currentPriceOriginal = marketPrices[ticker] || (data.totalCostOriginal / data.qty);
+      
+      // 當前市值 (台幣) = 股數 * 原幣市價 * 匯率
+      const currentValueTWD = data.qty * currentPriceOriginal * rate;
+      marketValue += currentValueTWD;
+
+      // 總成本 (台幣估算) = 原幣總成本 * 匯率
+      // 這裡使用當前匯率將成本轉為台幣，這代表「包含匯差」的損益
+      const totalCostTWD = data.totalCostOriginal * rate;
+
+      const avgCostOriginal = data.totalCostOriginal / data.qty;
+      const unrealizedPL = currentValueTWD - totalCostTWD;
+      const returnRate = (unrealizedPL / totalCostTWD);
 
       return {
         ticker,
+        isUS,
         qty: data.qty,
-        avgCost,
-        currentPrice,
-        currentValue,
-        unrealizedPL,
+        avgCostOriginal, // 原幣平均成本
+        currentPriceOriginal, // 原幣現價
+        currentValue: currentValueTWD, // 台幣市值
+        unrealizedPL, // 台幣損益
         returnRate
       };
     }).filter(Boolean);
 
     return { cashBalance, marketValue, holdingsList };
-  }, [trades, capitalStats.totalCapital, marketPrices]);
+  }, [trades, capitalStats.totalCapital, marketPrices, exchangeRate]);
 
   const totalAssets = portfolioStats.cashBalance + portfolioStats.marketValue;
   const totalPL = totalAssets - capitalStats.totalCapital;
   const totalROI = capitalStats.totalCapital > 0 ? (totalPL / capitalStats.totalCapital) : 0;
 
-  // 3. 準備圓餅圖資料
   const allocationData = useMemo(() => {
     const data = [
       { name: '現金 (TWD)', value: portfolioStats.cashBalance },
@@ -262,14 +278,13 @@ export default function App() {
     return data.filter(d => d.value > 0);
   }, [portfolioStats]);
 
-  // --- 【新功能】記錄歷史快照 ---
+  // --- 快照與歷史 ---
   const handleRecordHistory = async () => {
     if (!isAdmin) return;
     if (!window.confirm("確定要記錄當下的資產總值到歷史趨勢圖嗎？")) return;
 
     try {
       const today = new Date().toISOString().split('T')[0];
-      // 計算每個人的當前權益
       const userValues = {};
       investors.forEach(inv => {
         const invested = capitalStats.investorContributions[inv] || 0;
@@ -281,7 +296,7 @@ export default function App() {
         date: today,
         timestamp: Date.now(),
         total: totalAssets,
-        ...userValues // 儲存每個人的值: { Yi: 1000, Ma: 2000 }
+        ...userValues
       });
       alert("已成功記錄今日資產快照！");
     } catch (error) {
@@ -290,13 +305,11 @@ export default function App() {
     }
   };
 
-  // --- 【新功能】清除所有歷史數據 (測試用) ---
   const handleClearHistory = async () => {
     if (!isAdmin) return;
     if (!window.confirm("警告：確定要清除「所有」歷史折線圖數據嗎？此操作無法復原。")) return;
 
     try {
-      // Firestore 需要一筆筆刪除
       const querySnapshot = await getDocs(collection(db, "asset_history"));
       const batch = writeBatch(db);
       querySnapshot.forEach((doc) => {
@@ -313,7 +326,6 @@ export default function App() {
   // --- 視圖組件 ---
 
   const Dashboard = () => {
-    // --- 個人化視圖邏輯 ---
     const currentInvestorName = user ? INVESTOR_MAP[user.email] : null;
     const isSpecificInvestor = !isAdmin && currentInvestorName;
 
@@ -348,9 +360,16 @@ export default function App() {
           </div>
         ) : null}
 
+        {/* 顯示當前匯率提示 */}
+        {isAllowed && (
+          <div className="flex items-center justify-end text-xs text-slate-500">
+            <DollarSign className="w-3 h-3 mr-1" />
+            <span>美金參考匯率: <span className="font-bold text-slate-700">{exchangeRate}</span> TWD</span>
+          </div>
+        )}
+
         {isAdmin && (
           <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg space-y-6">
-            {/* 權限管理區塊 */}
             <div>
               <div className="flex items-center mb-3">
                 <Settings className="w-5 h-5 mr-2" />
@@ -391,7 +410,6 @@ export default function App() {
 
             <div className="border-t border-slate-600 my-4"></div>
 
-            {/* 歷史數據管理區塊 (新功能) */}
             <div>
               <div className="flex items-center mb-3">
                 <LineChartIcon className="w-5 h-5 mr-2" />
@@ -411,14 +429,10 @@ export default function App() {
                   <Trash2 className="w-4 h-4 mr-2" /> 清除歷史數據
                 </button>
               </div>
-              <p className="text-xs text-slate-400 mt-2">
-                * 請在更新完所有股價後，點擊「記錄今日快照」，折線圖才會出現新的點。
-              </p>
             </div>
           </div>
         )}
         
-        {/* 1. 資產趨勢折線圖 */}
         {isAllowed && historyData.length > 0 && (
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
             <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center">
@@ -448,7 +462,6 @@ export default function App() {
                     labelFormatter={(label) => `日期: ${label}`}
                   />
                   <Legend />
-                  {/* 如果是管理員，顯示 Total；如果是合夥人，顯示自己的名字 */}
                   <Line 
                     type="monotone" 
                     dataKey={isSpecificInvestor ? currentInvestorName : "total"} 
@@ -464,13 +477,12 @@ export default function App() {
           </div>
         )}
 
-        {/* 2. 儀表板卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
             <div className="text-slate-500 text-sm font-medium mb-1">{titlePrefix}資產 (NAV)</div>
             <div className="text-3xl font-bold text-slate-800">{secureMoney(displayAssets)}</div>
             <div className="text-xs text-slate-400 mt-2">
-              {isSpecificInvestor ? "依資金比例計算之權益" : "現金 + 股票市值"}
+              {isSpecificInvestor ? "依資金比例計算之權益" : "現金 + 股票市值 (台幣)"}
             </div>
           </div>
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
@@ -492,7 +504,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* 3. 合夥人權益分配表 */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50 flex items-center">
             <Users className="w-5 h-5 text-slate-500 mr-2" />
@@ -516,7 +527,6 @@ export default function App() {
                     const ratio = capitalStats.totalCapital > 0 ? (invested / capitalStats.totalCapital) : 0;
                     const currentValue = totalAssets * ratio;
                     const pl = currentValue - invested;
-                    // 高亮顯示自己
                     const isMe = inv === currentInvestorName;
 
                     return (
@@ -543,8 +553,7 @@ export default function App() {
     );
   };
 
-  // ... 其餘 FundManager, TradeManager, Portfolio 維持不變 ...
-  
+  // ... 其餘 FundManager, TradeManager 維持不變 ...
   const FundManager = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [investor, setInvestor] = useState(investors[0]);
@@ -807,7 +816,7 @@ export default function App() {
           <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
              <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center">
                <PieChartIcon className="w-5 h-5 mr-2" />
-               資產配置分析
+               資產配置分析 (台幣計價)
              </h3>
              <div className="h-[300px] w-full flex items-center justify-center">
                 {allocationData.length > 0 ? (
@@ -841,8 +850,8 @@ export default function App() {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
-              <h3 className="text-xl font-bold text-slate-800">持倉損益表</h3>
-              <p className="text-slate-500 text-sm">請手動更新「現價」欄位以獲得最新損益報告</p>
+              <h3 className="text-xl font-bold text-slate-800">持倉損益表 (自動匯率換算)</h3>
+              <p className="text-slate-500 text-sm">顯示金額皆已換算為台幣 (美股依代號自動判斷)</p>
             </div>
             {isAdmin && (
               <button 
@@ -860,10 +869,10 @@ export default function App() {
                 <tr className="text-slate-400 text-sm border-b border-slate-100">
                   <th className="pb-3 font-medium pl-4 whitespace-nowrap">代號</th>
                   <th className="pb-3 font-medium text-right whitespace-nowrap">持有股數</th>
-                  <th className="pb-3 font-medium text-right whitespace-nowrap">平均成本</th>
-                  <th className="pb-3 font-medium text-right w-40 whitespace-nowrap">現價 {isAdmin ? '(可編輯)' : ''}</th>
-                  <th className="pb-3 font-medium text-right whitespace-nowrap">市值</th>
-                  <th className="pb-3 font-medium text-right whitespace-nowrap">未實現損益</th>
+                  <th className="pb-3 font-medium text-right whitespace-nowrap">幣別</th>
+                  <th className="pb-3 font-medium text-right w-40 whitespace-nowrap">現價(原幣) {isAdmin ? '(可編輯)' : ''}</th>
+                  <th className="pb-3 font-medium text-right whitespace-nowrap">市值(TWD)</th>
+                  <th className="pb-3 font-medium text-right whitespace-nowrap">未實現損益(TWD)</th>
                   <th className="pb-3 font-medium text-right pr-4 whitespace-nowrap">報酬率</th>
                 </tr>
               </thead>
@@ -872,7 +881,9 @@ export default function App() {
                   <tr key={item.ticker} className="hover:bg-slate-50">
                     <td className="py-4 pl-4 font-bold text-slate-800 whitespace-nowrap">{item.ticker}</td>
                     <td className="py-4 text-right whitespace-nowrap">{item.qty}</td>
-                    <td className="py-4 text-right text-slate-500 whitespace-nowrap">{item.avgCost.toFixed(2)}</td>
+                    <td className="py-4 text-right text-xs text-slate-500 whitespace-nowrap">
+                      {item.isUS ? <span className="bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded">USD</span> : <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded">TWD</span>}
+                    </td>
                     <td className="py-4 text-right whitespace-nowrap">
                        <input 
                         type="number" 
@@ -880,7 +891,7 @@ export default function App() {
                         disabled={!isAdmin}
                         value={priceInputs[item.ticker] || ''} 
                         onChange={e => handlePriceChange(item.ticker, e.target.value)}
-                        placeholder={item.avgCost.toFixed(1)}
+                        placeholder={item.avgCostOriginal.toFixed(1)}
                         className={`input-field w-24 text-right ${isAdmin ? 'bg-indigo-50/50 border-indigo-200' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
                       />
                     </td>
