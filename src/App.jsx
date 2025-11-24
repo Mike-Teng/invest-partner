@@ -44,7 +44,7 @@ const formatMoney = (amount) => {
   return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(amount);
 };
 
-// 新增：原幣格式化 (美金顯示小數點2位，台幣0位)
+// 原幣格式化 (保留輔助函數，雖然市值改回台幣，但在其他地方可能未來會用到)
 const formatOriginalMoney = (amount, isUS) => {
   return new Intl.NumberFormat(isUS ? 'en-US' : 'zh-TW', { 
     style: 'currency', 
@@ -112,12 +112,6 @@ export default function App() {
   const secureMoney = (amount) => {
     if (!isAllowed) return "****";
     return formatMoney(amount);
-  };
-
-  // 新增：原幣安全顯示
-  const secureOriginalMoney = (amount, isUS) => {
-    if (!isAllowed) return "****";
-    return formatOriginalMoney(amount, isUS);
   };
 
   useEffect(() => {
@@ -261,8 +255,8 @@ export default function App() {
         qty: data.qty,
         avgCostOriginal,
         currentPriceOriginal,
-        marketValueOriginal, // 原幣市值 (用於顯示)
-        currentValue: currentValueTWD, // 台幣市值 (用於圓餅圖和總資產)
+        marketValueOriginal, 
+        currentValue: currentValueTWD, // 台幣市值
         unrealizedPL, // 台幣損益
         returnRate
       };
@@ -280,7 +274,7 @@ export default function App() {
       { name: '現金 (TWD)', value: portfolioStats.cashBalance },
       ...portfolioStats.holdingsList.map(h => ({
         name: h.ticker,
-        value: h.currentValue // 這裡必須用台幣，因為圓餅圖不能混雜幣別
+        value: h.currentValue
       }))
     ];
     return data.filter(d => d.value > 0);
@@ -561,6 +555,7 @@ export default function App() {
     );
   };
 
+  // ... 其餘 FundManager, TradeManager 維持不變 ...
   const FundManager = () => {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [investor, setInvestor] = useState(investors[0]);
@@ -878,7 +873,7 @@ export default function App() {
                   <th className="pb-3 font-medium text-right whitespace-nowrap">持有股數</th>
                   <th className="pb-3 font-medium text-right whitespace-nowrap">幣別</th>
                   <th className="pb-3 font-medium text-right w-40 whitespace-nowrap">現價(原幣) {isAdmin ? '(可編輯)' : ''}</th>
-                  <th className="pb-3 font-medium text-right whitespace-nowrap">市值(原幣)</th>
+                  <th className="pb-3 font-medium text-right whitespace-nowrap">市值(TWD)</th>
                   <th className="pb-3 font-medium text-right whitespace-nowrap">未實現損益(TWD)</th>
                   <th className="pb-3 font-medium text-right pr-4 whitespace-nowrap">報酬率</th>
                 </tr>
@@ -902,11 +897,11 @@ export default function App() {
                         className={`input-field w-24 text-right ${isAdmin ? 'bg-indigo-50/50 border-indigo-200' : 'bg-slate-50 border-slate-100 text-slate-400'}`}
                       />
                     </td>
-                    {/* 修改：顯示原幣市值 */}
+                    {/* 修改：改回顯示台幣市值 */}
                     <td className="py-4 text-right font-medium text-slate-800 whitespace-nowrap">
-                      {secureOriginalMoney(item.marketValueOriginal, item.isUS)}
+                      {secureMoney(item.currentValue)}
                     </td>
-                    {/* 維持：顯示台幣損益 */}
+                    {/* 未實現損益 (TWD) */}
                     <td className={`py-4 text-right font-medium whitespace-nowrap ${!isAllowed ? 'text-slate-600' : (item.unrealizedPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
                       {isAllowed && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}
                     </td>
