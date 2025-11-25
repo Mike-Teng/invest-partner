@@ -34,7 +34,7 @@ const ADMIN_EMAIL = "m88215@gmail.com";
 // 合夥人 Email 對應表
 const INVESTOR_MAP = {
   "yi.990131@gmail.com": "Yi",
-  "martinyu929@gmail.com": "Ma"
+  "aa1234567aa88@gmail.com": "Ma"
 };
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
