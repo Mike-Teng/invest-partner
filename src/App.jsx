@@ -838,7 +838,14 @@ export default function App() {
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip formatter={(value) => formatMoney(value)} />
+                      {/* 修改 Tooltip：計算並顯示百分比 */}
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          const total = allocationData.reduce((acc, curr) => acc + curr.value, 0);
+                          const percent = total > 0 ? (value / total) : 0;
+                          return [`${formatMoney(value)} (${formatPercent(percent)})`, name];
+                        }} 
+                      />
                       <Legend />
                     </PieChart>
                   </ResponsiveContainer>
