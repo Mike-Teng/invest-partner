@@ -6,7 +6,6 @@ import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid, AreaChart, Area
 } from 'recharts';
-// 新增引入: Landmark, PiggyBank, Coins, Percent
 import { 
   LayoutDashboard, Wallet, TrendingUp, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, 
   Trash2, Plus, Save, Users, AlertCircle, LogIn, LogOut, Lock, ShieldAlert, Settings, X,
@@ -65,12 +64,13 @@ const formatDateShort = (dateStr) => {
 
 // UI 組件：載入骨架
 const Skeleton = ({ className }) => (
-  <div className={`animate-pulse bg-slate-200 rounded ${className}`}></div>
+  <div className={`animate-pulse bg-slate-300/50 rounded ${className}`}></div>
 );
 
-// UI 組件：玻璃擬態卡片
+// UI 組件：調整後的玻璃擬態卡片
+// 修改：將 bg-white/30 改為 bg-white/80，大幅增加不透明度，提升閱讀性
 const GlassCard = ({ children, className = "" }) => (
-  <div className={`bg-white/80 backdrop-blur-md border border-white/50 shadow-lg rounded-2xl ${className}`}>
+  <div className={`bg-white/80 backdrop-blur-xl border border-white/50 shadow-xl rounded-2xl ${className}`}>
     {children}
   </div>
 );
@@ -81,7 +81,7 @@ export default function App() {
   
   const [user, setUser] = useState(null);
   const [allowedEmails, setAllowedEmails] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); // 載入狀態
+  const [isLoading, setIsLoading] = useState(true);
   
   const isAdmin = user && user.email === ADMIN_EMAIL;
   const isAllowed = user && (allowedEmails.includes(user.email) || isAdmin);
@@ -158,7 +158,7 @@ export default function App() {
     const unsubHistory = onSnapshot(qHistory, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setHistoryData(data);
-      setIsLoading(false); // 資料載入完成
+      setIsLoading(false);
     });
 
     return () => {
@@ -356,12 +356,12 @@ export default function App() {
     return (
       <div className="space-y-6">
         {!user ? (
-          <div className="bg-blue-50/80 backdrop-blur border border-blue-200 text-blue-700 px-6 py-4 rounded-2xl flex items-center shadow-sm">
+          <div className="bg-blue-50/80 backdrop-blur border border-blue-200 text-blue-700 px-6 py-4 rounded-xl flex items-center shadow-sm">
             <Lock className="w-5 h-5 mr-3" />
             <span className="font-medium">請登入以查看財務數據</span>
           </div>
         ) : !isAllowed ? (
-          <div className="bg-red-50/80 backdrop-blur border border-red-200 text-red-700 px-6 py-4 rounded-2xl flex items-center shadow-sm">
+          <div className="bg-red-50/80 backdrop-blur border border-red-200 text-red-700 px-6 py-4 rounded-xl flex items-center shadow-sm">
             <ShieldAlert className="w-5 h-5 mr-3" />
             <span>您的帳號 ({user.email}) 未在授權名單中。請聯繫管理員 ({ADMIN_EMAIL}) 開通權限。</span>
           </div>
@@ -370,76 +370,11 @@ export default function App() {
         {isAllowed && (
           <div className="flex items-center justify-end text-xs text-slate-500 font-medium">
             <DollarSign className="w-3 h-3 mr-1" />
-            <span>美金參考匯率: <span className="text-slate-700 bg-white px-2 py-1 rounded-md shadow-sm ml-1">{exchangeRate}</span> TWD</span>
+            <span>美金參考匯率: <span className="text-slate-700 bg-white/50 border border-white/50 px-2 py-1 rounded-md shadow-sm ml-1">{exchangeRate}</span> TWD</span>
           </div>
         )}
 
-        {isAdmin && (
-          <GlassCard className="p-6 bg-slate-800/90 text-white border-slate-700">
-            <div>
-              <div className="flex items-center mb-4">
-                <Settings className="w-5 h-5 mr-2 text-blue-400" />
-                <h3 className="font-bold">成員權限管理</h3>
-              </div>
-              <div className="mb-4">
-                <form onSubmit={handleAddEmail} className="flex gap-2">
-                  <input 
-                    type="email" 
-                    placeholder="輸入合夥人 Email" 
-                    value={newEmail}
-                    onChange={e => setNewEmail(e.target.value)}
-                    className="flex-1 p-2.5 rounded-xl text-slate-900 outline-none border-2 border-transparent focus:border-blue-500 transition-all"
-                    required
-                  />
-                  <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-6 py-2.5 rounded-xl font-bold transition-all active:scale-95">
-                    新增
-                  </button>
-                </form>
-              </div>
-              <div className="space-y-2">
-                <div className="text-xs text-slate-400 mb-1">目前允許名單：</div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="bg-slate-700/50 px-3 py-1.5 rounded-lg text-sm flex items-center border border-slate-600">
-                    {ADMIN_EMAIL} (管理員)
-                  </span>
-                  {allowedEmails.map(email => (
-                    <span key={email} className="bg-slate-700/50 px-3 py-1.5 rounded-lg text-sm flex items-center border border-slate-600 group hover:border-red-400/50 hover:bg-red-900/20 transition-all">
-                      {email}
-                      <button onClick={() => handleRemoveEmail(email)} className="ml-2 text-slate-400 hover:text-red-400">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-slate-700 my-5"></div>
-
-            <div>
-              <div className="flex items-center mb-3">
-                <LineChartIcon className="w-5 h-5 mr-2 text-green-400" />
-                <h3 className="font-bold">歷史趨勢圖管理</h3>
-              </div>
-              <div className="flex gap-3">
-                <button 
-                  onClick={handleRecordHistory}
-                  className="flex-1 bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-600/50 px-4 py-2 rounded-xl font-bold transition-all flex items-center justify-center"
-                >
-                  <Plus className="w-4 h-4 mr-2" /> 記錄今日快照
-                </button>
-                <button 
-                  onClick={handleClearHistory}
-                  className="flex-1 bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/50 px-4 py-2 rounded-xl font-bold transition-all flex items-center justify-center"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" /> 清除歷史數據
-                </button>
-              </div>
-            </div>
-          </GlassCard>
-        )}
-        
-        {/* 1. 資產趨勢折線圖 */}
+        {/* 1. 資產趨勢折線圖 (最上方) */}
         {isAllowed && historyData.length > 0 && (
           <GlassCard className="p-6">
             <h3 className="text-lg font-bold text-slate-700 mb-6 flex items-center">
@@ -474,7 +409,7 @@ export default function App() {
                     domain={['auto', 'auto']}
                   />
                   <Tooltip 
-                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     formatter={(value) => [formatMoney(value), "資產"]}
                     labelFormatter={(label) => `日期: ${label}`}
                   />
@@ -493,7 +428,33 @@ export default function App() {
           </GlassCard>
         )}
 
-        {/* 2. 儀表板卡片 */}
+        {/* 2. 歷史趨勢圖管理 (僅管理員可見) */}
+        {isAdmin && (
+          <GlassCard className="p-4 bg-slate-800/90 text-white border-slate-700">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center">
+                <LineChartIcon className="w-5 h-5 mr-2 text-green-400" />
+                <h3 className="font-bold">歷史趨勢圖管理</h3>
+              </div>
+              <div className="flex gap-3 w-full md:w-auto">
+                <button 
+                  onClick={handleRecordHistory}
+                  className="flex-1 md:flex-none bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-600/50 px-4 py-2 rounded-xl font-bold transition-all flex items-center justify-center text-sm"
+                >
+                  <Plus className="w-4 h-4 mr-2" /> 記錄今日快照
+                </button>
+                <button 
+                  onClick={handleClearHistory}
+                  className="flex-1 md:flex-none bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/50 px-4 py-2 rounded-xl font-bold transition-all flex items-center justify-center text-sm"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" /> 清除數據
+                </button>
+              </div>
+            </div>
+          </GlassCard>
+        )}
+
+        {/* 3. 儀表板卡片 */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <GlassCard className="p-6 relative overflow-hidden group">
             <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -535,7 +496,7 @@ export default function App() {
           </GlassCard>
         </div>
 
-        {/* 3. 合夥人權益分配表 */}
+        {/* 4. 合夥人權益分配表 */}
         <GlassCard className="overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex items-center">
             <Users className="w-5 h-5 text-slate-500 mr-2" />
@@ -583,6 +544,49 @@ export default function App() {
             </div>
           </div>
         </GlassCard>
+
+        {/* 5. 成員權限管理 (移到最底部，僅管理員可見) */}
+        {isAdmin && (
+          <GlassCard className="p-6 bg-slate-800/90 text-white border-slate-700">
+            <div>
+              <div className="flex items-center mb-4">
+                <Settings className="w-5 h-5 mr-2 text-blue-400" />
+                <h3 className="font-bold">成員權限管理</h3>
+              </div>
+              <div className="mb-4">
+                <form onSubmit={handleAddEmail} className="flex gap-2">
+                  <input 
+                    type="email" 
+                    placeholder="輸入合夥人 Email" 
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value)}
+                    className="flex-1 p-2.5 rounded-xl text-slate-900 outline-none border-2 border-transparent focus:border-blue-500 transition-all"
+                    required
+                  />
+                  <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-6 py-2.5 rounded-xl font-bold transition-all active:scale-95">
+                    新增
+                  </button>
+                </form>
+              </div>
+              <div className="space-y-2">
+                <div className="text-xs text-slate-400 mb-1">目前允許名單：</div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="bg-slate-700/50 px-3 py-1.5 rounded-lg text-sm flex items-center border border-slate-600">
+                    {ADMIN_EMAIL} (管理員)
+                  </span>
+                  {allowedEmails.map(email => (
+                    <span key={email} className="bg-slate-700/50 px-3 py-1.5 rounded-lg text-sm flex items-center border border-slate-600 group hover:border-red-400/50 hover:bg-red-900/20 transition-all">
+                      {email}
+                      <button onClick={() => handleRemoveEmail(email)} className="ml-2 text-slate-400 hover:text-red-400">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+        )}
       </div>
     );
   };
@@ -945,7 +949,7 @@ export default function App() {
                       </Pie>
                       {/* 修改 Tooltip：計算並顯示百分比 */}
                       <Tooltip 
-                        contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                         formatter={(value, name) => {
                           const total = allocationData.reduce((acc, curr) => acc + curr.value, 0);
                           const percent = total > 0 ? (value / total) : 0;
@@ -1017,6 +1021,7 @@ export default function App() {
                         className={`input-field w-24 text-right ${isAdmin ? 'bg-indigo-50/50 border-indigo-200 focus:ring-2 focus:ring-indigo-200' : 'bg-transparent border-transparent text-slate-600'}`}
                       />
                     </td>
+                    {/* 顯示台幣市值 */}
                     <td className="py-4 text-right font-medium text-slate-800 whitespace-nowrap">
                       {secureMoney(item.currentValue)}
                     </td>
@@ -1050,9 +1055,17 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-blue-50 font-sans text-slate-900 pb-24 md:pb-0">
+    <div 
+      className="min-h-screen font-sans text-slate-900 pb-24 md:pb-0 relative overflow-hidden"
+      style={{
+        backgroundImage: "url('/Gemini_bg.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundAttachment: 'fixed'
+      }}
+    >
       {/* Sidebar / Bottom Nav */}
-      <nav className="fixed bottom-0 w-full bg-white/90 backdrop-blur-lg border-t border-slate-200 md:w-64 md:h-full md:border-t-0 md:border-r md:left-0 z-50 flex md:flex-col justify-between md:justify-start pb-safe md:pb-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] md:shadow-none">
+      <nav className="fixed bottom-0 w-full bg-white/80 backdrop-blur-xl border-t border-slate-200/50 md:w-64 md:h-full md:border-t-0 md:border-r md:left-0 z-50 flex md:flex-col justify-between md:justify-start pb-safe md:pb-0 shadow-lg md:shadow-none">
         <div className="hidden md:flex items-center p-8 mb-4">
           <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold mr-3 text-xl shadow-lg shadow-blue-200">$</div>
           <span className="text-xl font-bold text-slate-800 tracking-tight">InvestPartner</span>
@@ -1065,10 +1078,10 @@ export default function App() {
           <NavButton active={activeTab === 'portfolio'} onClick={() => setActiveTab('portfolio')} icon={<PieChartIcon />} label="持倉與市價" />
         </div>
 
-        <div className="hidden md:block p-6 border-t border-slate-100">
+        <div className="hidden md:block p-6 border-t border-slate-100/50">
           {user ? (
              <div className="space-y-4">
-               <div className="flex items-center text-xs text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100">
+               <div className="flex items-center text-xs text-slate-500 bg-white/50 p-3 rounded-xl border border-slate-200/50">
                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 text-blue-600 flex items-center justify-center font-bold mr-3">
                    {user.displayName?.[0] || 'U'}
                  </div>
@@ -1094,21 +1107,21 @@ export default function App() {
       </nav>
 
       {/* Mobile Top Bar */}
-      <div className="md:hidden flex items-center justify-between p-4 bg-white/80 backdrop-blur sticky top-0 z-40 border-b border-slate-100">
+      <div className="md:hidden flex items-center justify-between p-4 bg-white/70 backdrop-blur-lg sticky top-0 z-40 border-b border-slate-200/50 shadow-sm">
          <div className="flex items-center">
           <div className="w-8 h-8 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 text-lg shadow-md">$</div>
           <span className="text-lg font-bold text-slate-800">InvestPartner</span>
         </div>
         <div>
           {user ? (
-            <button onClick={handleLogout} className="bg-slate-100 p-2 rounded-full text-slate-600"><LogOut className="w-5 h-5" /></button>
+            <button onClick={handleLogout} className="bg-white/80 p-2 rounded-full text-slate-600 shadow-sm"><LogOut className="w-5 h-5" /></button>
           ) : (
             <button onClick={handleLogin} className="bg-slate-800 p-2 rounded-full text-white shadow-lg shadow-slate-300"><LogIn className="w-5 h-5" /></button>
           )}
         </div>
       </div>
 
-      <main className="pt-6 px-4 md:px-10 max-w-7xl mx-auto md:pl-72 transition-all duration-300">
+      <main className="pt-6 px-4 md:px-10 max-w-7xl mx-auto md:pl-72 transition-all duration-300 relative z-10">
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-slate-800 mb-2">
             {activeTab === 'dashboard' && '投資組合總覽'}
@@ -1170,7 +1183,7 @@ const NavButton = ({ active, onClick, icon, label }) => (
     className={`
       flex flex-col md:flex-row items-center md:px-4 md:py-3.5 rounded-xl transition-all w-full mb-1 md:mb-0
       ${active 
-        ? 'text-blue-600 bg-blue-50 font-bold shadow-sm' 
+        ? 'text-blue-600 bg-blue-50/80 font-bold shadow-sm backdrop-blur-sm' 
         : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50/50'
       }
     `}
