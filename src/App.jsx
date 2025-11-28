@@ -64,11 +64,10 @@ const formatDateShort = (dateStr) => {
 
 // UI 組件：載入骨架
 const Skeleton = ({ className }) => (
-  <div className={`animate-pulse bg-slate-300/50 rounded ${className}`}></div>
+  <div className={`animate-pulse bg-slate-200 rounded ${className}`}></div>
 );
 
-// UI 組件：調整後的玻璃擬態卡片
-// 修改：將 bg-white/30 改為 bg-white/80，大幅增加不透明度，提升閱讀性
+// UI 組件：玻璃擬態卡片 (維持 80% 不透明度，適應灰白背景)
 const GlassCard = ({ children, className = "" }) => (
   <div className={`bg-white/80 backdrop-blur-xl border border-white/50 shadow-xl rounded-2xl ${className}`}>
     {children}
@@ -430,22 +429,22 @@ export default function App() {
 
         {/* 2. 歷史趨勢圖管理 (僅管理員可見) */}
         {isAdmin && (
-          <GlassCard className="p-4 bg-slate-800/90 text-white border-slate-700">
+          <GlassCard className="p-4 bg-white text-slate-800">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center">
-                <LineChartIcon className="w-5 h-5 mr-2 text-green-400" />
-                <h3 className="font-bold">歷史趨勢圖管理</h3>
+                <LineChartIcon className="w-5 h-5 mr-2 text-green-600" />
+                <h3 className="font-bold text-slate-800">歷史趨勢圖管理</h3>
               </div>
               <div className="flex gap-3 w-full md:w-auto">
                 <button 
                   onClick={handleRecordHistory}
-                  className="flex-1 md:flex-none bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-600/50 px-4 py-2 rounded-xl font-bold transition-all flex items-center justify-center text-sm"
+                  className="flex-1 md:flex-none bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-4 py-2 rounded-xl font-bold transition-all flex items-center justify-center text-sm"
                 >
                   <Plus className="w-4 h-4 mr-2" /> 記錄今日快照
                 </button>
                 <button 
                   onClick={handleClearHistory}
-                  className="flex-1 md:flex-none bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-600/50 px-4 py-2 rounded-xl font-bold transition-all flex items-center justify-center text-sm"
+                  className="flex-1 md:flex-none bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2 rounded-xl font-bold transition-all flex items-center justify-center text-sm"
                 >
                   <Trash2 className="w-4 h-4 mr-2" /> 清除數據
                 </button>
@@ -547,11 +546,11 @@ export default function App() {
 
         {/* 5. 成員權限管理 (移到最底部，僅管理員可見) */}
         {isAdmin && (
-          <GlassCard className="p-6 bg-slate-800/90 text-white border-slate-700">
+          <GlassCard className="p-6 bg-white text-slate-800 border-slate-100">
             <div>
               <div className="flex items-center mb-4">
-                <Settings className="w-5 h-5 mr-2 text-blue-400" />
-                <h3 className="font-bold">成員權限管理</h3>
+                <Settings className="w-5 h-5 mr-2 text-blue-600" />
+                <h3 className="font-bold text-slate-800">成員權限管理</h3>
               </div>
               <div className="mb-4">
                 <form onSubmit={handleAddEmail} className="flex gap-2">
@@ -560,10 +559,10 @@ export default function App() {
                     placeholder="輸入合夥人 Email" 
                     value={newEmail}
                     onChange={e => setNewEmail(e.target.value)}
-                    className="flex-1 p-2.5 rounded-xl text-slate-900 outline-none border-2 border-transparent focus:border-blue-500 transition-all"
+                    className="flex-1 p-2.5 rounded-xl text-slate-900 outline-none border-2 border-slate-200 focus:border-blue-500 transition-all"
                     required
                   />
-                  <button type="submit" className="bg-blue-600 hover:bg-blue-500 px-6 py-2.5 rounded-xl font-bold transition-all active:scale-95">
+                  <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl font-bold transition-all active:scale-95">
                     新增
                   </button>
                 </form>
@@ -571,11 +570,11 @@ export default function App() {
               <div className="space-y-2">
                 <div className="text-xs text-slate-400 mb-1">目前允許名單：</div>
                 <div className="flex flex-wrap gap-2">
-                  <span className="bg-slate-700/50 px-3 py-1.5 rounded-lg text-sm flex items-center border border-slate-600">
+                  <span className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm flex items-center border border-slate-200 text-slate-700">
                     {ADMIN_EMAIL} (管理員)
                   </span>
                   {allowedEmails.map(email => (
-                    <span key={email} className="bg-slate-700/50 px-3 py-1.5 rounded-lg text-sm flex items-center border border-slate-600 group hover:border-red-400/50 hover:bg-red-900/20 transition-all">
+                    <span key={email} className="bg-slate-100 px-3 py-1.5 rounded-lg text-sm flex items-center border border-slate-200 group text-slate-700 hover:border-red-200 hover:bg-red-50 transition-all">
                       {email}
                       <button onClick={() => handleRemoveEmail(email)} className="ml-2 text-slate-400 hover:text-red-400">
                         <X className="w-3 h-3" />
@@ -1058,10 +1057,7 @@ export default function App() {
     <div 
       className="min-h-screen font-sans text-slate-900 pb-24 md:pb-0 relative overflow-hidden"
       style={{
-        backgroundImage: "url('/Gemini_bg.png')",
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundAttachment: 'fixed'
+        backgroundColor: '#f8fafc', // slate-50
       }}
     >
       {/* Sidebar / Bottom Nav */}
