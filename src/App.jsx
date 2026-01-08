@@ -46,8 +46,14 @@ const safeNumber = (val) => {
   return isNaN(num) ? 0 : num;
 };
 
+// 顯示總金額 (不帶小數，保持整潔)
 const formatMoney = (amount) => {
   return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', maximumFractionDigits: 0 }).format(safeNumber(amount));
+};
+
+// 新增：顯示單價/淨值/平均成本 (強制兩位小數)
+const formatPrice = (amount) => {
+  return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(safeNumber(amount));
 };
 
 const formatOriginalMoney = (amount, isUS) => {
@@ -136,6 +142,13 @@ export default function App() {
     if (isLoading) return <Skeleton className="h-6 w-24 inline-block" />;
     if (!isAllowed) return "****";
     return formatMoney(amount);
+  };
+  
+  // 安全顯示單價
+  const securePrice = (amount) => {
+    if (isLoading) return <Skeleton className="h-6 w-16 inline-block" />;
+    if (!isAllowed) return "****";
+    return formatPrice(amount);
   };
 
   useEffect(() => {
@@ -290,7 +303,7 @@ export default function App() {
     return { cashBalance, marketValue, holdingsList };
   }, [trades, capitalStats.totalCapital, marketPrices, exchangeRate]);
 
-  // --- 2. 基金單位會計系統 (含手動修正支援) ---
+  // --- 2. 基金單位會計系統 ---
   const unitStats = useMemo(() => {
     let totalInvestedCash = 0;
     let totalUnitsIssued = 0;
@@ -306,9 +319,7 @@ export default function App() {
       let units = safeNumber(f.units);
       let calculatedBuyPrice = safeNumber(f.buyPrice);
 
-      // 如果資料庫中沒有 units 欄位，且也沒有手動記錄過 buyPrice
       if (units <= 0 && calculatedBuyPrice <= 0) {
-         // 嘗試回溯歷史快照
          const prevHistory = historyData
             .filter(h => h.date < f.date) 
             .pop();
@@ -334,7 +345,6 @@ export default function App() {
              units = amt / 10;
          }
       } else {
-          // 如果有記錄單位數或價格，依照紀錄計算
           if (calculatedBuyPrice > 0 && units <= 0) {
               units = amt / calculatedBuyPrice;
           } else if (units > 0 && calculatedBuyPrice <= 0) {
@@ -356,7 +366,7 @@ export default function App() {
       });
     });
 
-    const cashBalance = totalInvestedCash + portfolioStats.tradeCashFlow; // 這邊變數僅供內部參考
+    const cashBalance = totalInvestedCash + portfolioStats.tradeCashFlow;
     const totalAssets = portfolioStats.cashBalance + portfolioStats.marketValue;
     const currentUnitPrice = totalUnitsIssued > 0 ? (totalAssets / totalUnitsIssued) : 10;
 
@@ -465,7 +475,8 @@ export default function App() {
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
              <div className="flex items-center">
                <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded mr-2">單位淨值法</span>
-               <span>當前淨值: <span className="font-bold text-slate-800">{formatMoney(unitStats.currentUnitPrice)}</span></span>
+               {/* 修改: 使用 formatPrice 顯示小數點後兩位 */}
+               <span>當前淨值: <span className="font-bold text-slate-800">{formatPrice(unitStats.currentUnitPrice)}</span></span>
              </div>
              <div className="flex items-center">
                <DollarSign className="w-3 h-3 mr-1" />
@@ -636,7 +647,8 @@ export default function App() {
                         </td>
                         <td className="py-4 whitespace-nowrap">{secureMoney(data.invested)}</td>
                         <td className="py-4 font-mono text-slate-500 whitespace-nowrap">
-                           {isAllowed ? formatMoney(avgCost) : "**"}
+                           {/* 修改: 使用 formatPrice 顯示小數點後兩位 */}
+                           {isAllowed ? formatPrice(avgCost) : "**"}
                         </td>
                         <td className="py-4 font-mono text-slate-500 whitespace-nowrap">
                            {isAllowed ? new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(units) : "**"}
@@ -862,7 +874,8 @@ export default function App() {
                       <td className="py-4 text-right font-mono text-slate-800 whitespace-nowrap pr-4">{secureMoney(f.amount)}</td>
                       <td className="py-4 text-right font-mono text-slate-500 whitespace-nowrap pr-4 text-sm group cursor-pointer" onClick={() => handleEditNav(f)}>
                         <div className="flex items-center justify-end">
-                            {formatMoney(f.buyPrice)}
+                            {/* 修改: 使用 formatPrice 顯示小數點後兩位 */}
+                            {formatPrice(f.buyPrice)}
                             {isAdmin && <Pencil className="w-3 h-3 ml-2 opacity-0 group-hover:opacity-100 text-blue-400" />}
                         </div>
                       </td>
@@ -895,7 +908,8 @@ export default function App() {
                     </div>
                     <div className="font-mono text-slate-800 font-bold">{secureMoney(f.amount)}</div>
                     <div className="text-xs text-slate-400 mt-1 flex gap-3 items-center" onClick={() => handleEditNav(f)}>
-                       <span className="flex items-center">淨值: {formatMoney(f.buyPrice)} {isAdmin && <Pencil className="w-3 h-3 ml-1 text-slate-300" />}</span>
+                       {/* 修改: 使用 formatPrice 顯示小數點後兩位 */}
+                       <span className="flex items-center">淨值: {formatPrice(f.buyPrice)} {isAdmin && <Pencil className="w-3 h-3 ml-1 text-slate-300" />}</span>
                        <span>單位: {formatUnit(f.units)}</span>
                     </div>
                   </div>
@@ -959,7 +973,8 @@ export default function App() {
         <div className="lg:col-span-2">
            <Card className="overflow-hidden">
             <div className="p-4 border-b border-slate-100 bg-slate-50"><h3 className="font-bold text-slate-700 flex items-center"><Activity className="w-4 h-4 mr-2 text-slate-400"/> 交易歷史</h3></div>
-            <div className="overflow-x-auto p-6">
+            {/* Desktop View */}
+            <div className="hidden md:block overflow-x-auto p-6">
               <table className="w-full text-left">
                 <thead><tr className="text-slate-400 text-sm border-b"><th className="pb-3 pl-2">日期</th><th className="pb-3">代號</th><th className="pb-3">類別</th><th className="pb-3 text-right">成交價</th><th className="pb-3 text-right">股數</th><th className="pb-3 text-right pr-4">總額</th>{isAdmin && <th className="pb-3 text-center">操作</th>}</tr></thead>
                 <tbody className="text-slate-600">
@@ -974,6 +989,43 @@ export default function App() {
                   {trades.length===0 && <tr><td colSpan="7" className="p-8 text-center text-slate-400">無紀錄</td></tr>}
                 </tbody>
               </table>
+            </div>
+
+            {/* Mobile Card View - 交易紀錄 (優化版) */}
+            <div className="md:hidden p-4 space-y-3">
+              {[...trades].sort((a,b) => new Date(b.date) - new Date(a.date)).map(t => (
+                <div key={t.id} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  {/* 第一行: 股票代號與日期 */}
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${t.type === 'BUY' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                        {t.type === 'BUY' ? '買入' : '賣出'}
+                      </span>
+                      <span className="font-bold text-lg text-slate-800">{t.ticker}</span>
+                    </div>
+                    <span className="text-xs text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-100">{t.date}</span>
+                  </div>
+                  
+                  {/* 第二行: 詳細數據 grid */}
+                  <div className="grid grid-cols-2 gap-2 text-sm border-t border-slate-200 pt-2 mt-2">
+                    <div className="text-slate-500">成交價: <span className="text-slate-700">{t.price}</span></div>
+                    <div className="text-slate-500 text-right">股數: <span className="text-slate-700">{t.qty}</span></div>
+                    <div className="col-span-2 flex justify-between items-center bg-white p-2 rounded-lg mt-1">
+                      <span className="text-slate-500">總金額</span>
+                      <span className="font-mono font-bold text-slate-800 text-base">{secureMoney(t.price * t.qty)}</span>
+                    </div>
+                  </div>
+
+                  {isAdmin && (
+                    <div className="mt-3 flex justify-end">
+                      <button onClick={() => handleDelete(t.id)} className="text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded flex items-center transition-colors">
+                        <Trash2 className="w-3 h-3 mr-1" /> 刪除紀錄
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {trades.length === 0 && <div className="text-center text-slate-400 py-8">目前無紀錄</div>}
             </div>
           </Card>
         </div>
@@ -1008,7 +1060,9 @@ export default function App() {
             <div><h3 className="text-xl font-bold text-slate-800">持倉損益表 (TWD)</h3><p className="text-slate-500 text-sm">金額已換算台幣</p></div>
             {isAdmin && <button onClick={savePrices} className={`flex items-center px-4 py-2 rounded-xl font-medium transition-all shadow-lg ${savedMsg?'bg-green-600 text-white':'bg-indigo-600 hover:bg-indigo-700 text-white'}`}>{savedMsg ? '已同步!' : <><Save className="w-4 h-4 mr-2"/> 更新市價</>}</button>}
            </div>
-           <div className="overflow-x-auto">
+           
+           {/* Desktop Table */}
+           <div className="hidden md:block overflow-x-auto">
              <table className="w-full text-left">
               <thead><tr className="text-slate-400 text-sm border-b"><th className="pb-3 pl-4">代號</th><th className="pb-3 text-right">股數</th><th className="pb-3 text-right">幣別</th><th className="pb-3 text-right w-40">現價(原幣)</th><th className="pb-3 text-right">市值(TWD)</th><th className="pb-3 text-right">損益(TWD)</th><th className="pb-3 text-right pr-4">報酬率</th></tr></thead>
               <tbody className="text-slate-600">
@@ -1027,6 +1081,64 @@ export default function App() {
               </tbody>
              </table>
            </div>
+
+           {/* Mobile Card View - 持倉損益 (新增：3欄佈局) */}
+           <div className="md:hidden space-y-4 mt-4">
+              {portfolioStats.holdingsList.map(item => (
+                <div key={item.ticker} className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                  {/* 頭部：代號與狀態 */}
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center gap-2">
+                       <span className="text-lg font-bold text-slate-800">{item.ticker}</span>
+                       <span className="text-xs bg-slate-200 px-2 py-0.5 rounded text-slate-600">{item.isUS ? 'USD' : 'TWD'}</span>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded font-bold ${item.returnRate >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                      {isAllowed ? formatPercent(item.returnRate) : "****"}
+                    </span>
+                  </div>
+
+                  {/* 數據 Grid (3 columns) */}
+                  <div className="grid grid-cols-3 gap-2 text-sm mt-3">
+                    <div className="bg-white p-2 rounded-lg border border-slate-100 flex flex-col justify-center">
+                      <div className="text-slate-400 text-[10px] mb-1">持有股數</div>
+                      <div className="font-medium text-slate-700">{item.qty}</div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-slate-100 flex flex-col justify-center">
+                      <div className="text-slate-400 text-[10px] mb-1">成本均價</div>
+                      <div className="font-medium text-slate-700">{formatOriginalMoney(item.avgCostOriginal, item.isUS)}</div>
+                    </div>
+                    <div className="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-center">
+                      <div className="text-slate-400 text-[10px] mb-1">現價</div>
+                       <input 
+                        type="number" 
+                        step="0.1" 
+                        disabled={!isAdmin} 
+                        value={priceInputs[item.ticker]||''} 
+                        onChange={e=>handlePriceChange(item.ticker,e.target.value)} 
+                        placeholder={item.avgCostOriginal.toFixed(1)} 
+                        className={`w-full outline-none font-bold text-sm ${isAdmin ? 'text-indigo-600' : 'text-slate-600 bg-transparent'}`}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 底部總結：市值與損益 */}
+                  <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
+                    <div>
+                      <div className="text-xs text-slate-400">市值 (TWD)</div>
+                      <div className="font-bold text-slate-800 text-lg">{secureMoney(item.currentValue)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-xs text-slate-400">損益 (TWD)</div>
+                      <div className={`font-bold text-lg ${!isAllowed?'text-slate-600':(item.unrealizedPL>=0?'text-green-600':'text-red-600')}`}>
+                        {isAllowed && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {portfolioStats.holdingsList.length === 0 && <div className="text-center text-slate-400 py-8">無持倉</div>}
+           </div>
+
         </Card>
       </div>
     );
