@@ -442,6 +442,7 @@ export default function App() {
   const Dashboard = () => {
     const currentInvestorName = user ? INVESTOR_MAP[user.email] : null;
     const isSpecificInvestor = !isAdmin && currentInvestorName;
+    const [showProfitChart, setShowProfitChart] = useState(false);
 
     let displayAssets = unitStats.totalAssets;
     let displayCapital = unitStats.totalInvestedCash;
@@ -456,6 +457,30 @@ export default function App() {
 
     const displayPL = displayAssets - displayCapital;
     const displayROI = displayCapital > 0 ? (displayPL / displayCapital) : 0;
+
+    // 計算歷史獲利資料
+    const chartData = useMemo(() => {
+      return historyData.map(h => {
+        let capTotal = 0;
+        let capMe = 0;
+        // 計算該歷史日期之前的總投入本金
+        funds.forEach(f => {
+          if (f.date <= h.date) {
+            const amt = safeNumber(f.amount);
+            capTotal += amt;
+            if (isSpecificInvestor && f.investor === currentInvestorName) {
+              capMe += amt;
+            }
+          }
+        });
+        
+        return {
+          ...h,
+          totalProfit: h.total - capTotal,
+          meProfit: (h[currentInvestorName] || 0) - capMe
+        };
+      });
+    }, [historyData, funds, isSpecificInvestor, currentInvestorName]);
 
     return (
       <div className="space-y-6">
@@ -475,7 +500,6 @@ export default function App() {
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
              <div className="flex items-center">
                <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded mr-2">單位淨值法</span>
-               {/* 修改: 使用 formatPrice 顯示小數點後兩位 */}
                <span>當前淨值: <span className="font-bold text-slate-800">{formatPrice(unitStats.currentUnitPrice)}</span></span>
              </div>
              <div className="flex items-center">
@@ -485,22 +509,45 @@ export default function App() {
           </div>
         )}
 
-        {/* 1. 資產趨勢折線圖 */}
-        {isAllowed && historyData.length > 0 && (
+        {/* 1. 資產/獲利趨勢折線圖 */}
+        {isAllowed && chartData.length > 0 && (
           <Card className="p-6">
-            <h3 className="text-lg font-bold text-slate-700 mb-6 flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg mr-3 text-blue-600">
-                <LineChartIcon className="w-5 h-5" />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
+              <h3 className="text-lg font-bold text-slate-700 flex items-center">
+                <div className={`p-2 rounded-lg mr-3 transition-colors ${showProfitChart ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+                  <LineChartIcon className="w-5 h-5" />
+                </div>
+                {showProfitChart ? '純獲利趨勢' : '資產成長趨勢'}
+              </h3>
+              
+              {/* 切換開關 */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-auto">
+                <button
+                  onClick={() => setShowProfitChart(false)}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${!showProfitChart ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  資產總值
+                </button>
+                <button
+                  onClick={() => setShowProfitChart(true)}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${showProfitChart ? 'bg-white text-green-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  純獲利
+                </button>
               </div>
-              資產成長趨勢
-            </h3>
+            </div>
+            
             <div className="h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={historyData}>
+                <AreaChart data={chartData}>
                   <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id="colorAsset" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                    <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
@@ -521,17 +568,17 @@ export default function App() {
                   />
                   <Tooltip 
                     contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                    formatter={(value) => [formatMoney(value), "資產"]}
+                    formatter={(value) => [formatMoney(value), showProfitChart ? "純獲利" : "資產"]}
                     labelFormatter={(label) => `日期: ${label}`}
                   />
                   <Area 
                     type="monotone" 
-                    dataKey={isSpecificInvestor ? currentInvestorName : "total"} 
-                    name={isSpecificInvestor ? "我的資產" : "總資產"}
-                    stroke="#3b82f6" 
+                    dataKey={showProfitChart ? (isSpecificInvestor ? "meProfit" : "totalProfit") : (isSpecificInvestor ? currentInvestorName : "total")} 
+                    name={showProfitChart ? (isSpecificInvestor ? "我的獲利" : "總獲利") : (isSpecificInvestor ? "我的資產" : "總資產")}
+                    stroke={showProfitChart ? "#10b981" : "#3b82f6"} 
                     strokeWidth={3}
                     fillOpacity={1} 
-                    fill="url(#colorValue)" 
+                    fill={`url(#${showProfitChart ? 'colorProfit' : 'colorAsset'})`} 
                   />
                 </AreaChart>
               </ResponsiveContainer>
