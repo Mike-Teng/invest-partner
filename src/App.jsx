@@ -2,15 +2,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove, query, orderBy, getDocs, writeBatch } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
-import { 
+import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid, AreaChart, Area
 } from 'recharts';
-import { 
-  LayoutDashboard, Wallet, TrendingUp, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight, 
+import {
+  LayoutDashboard, Wallet, TrendingUp, PieChart as PieChartIcon, ArrowUpRight, ArrowDownRight,
   Trash2, Plus, Save, Users, AlertCircle, LogIn, LogOut, Lock, ShieldAlert, Settings, X,
   LineChart as LineChartIcon, RefreshCw, DollarSign, Activity, Calendar,
-  Landmark, PiggyBank, Coins, Percent, Pencil 
+  Landmark, PiggyBank, Coins, Percent, Pencil
 } from 'lucide-react';
 
 // --- Firebase 設定 ---
@@ -27,10 +27,10 @@ const firebaseConfig = {
 // 初始化 Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
-const auth = getAuth(app); 
+const auth = getAuth(app);
 
 // --- 【權限設定區域】 ---
-const ADMIN_EMAIL = "m88215@gmail.com"; 
+const ADMIN_EMAIL = "m88215@gmail.com";
 
 // 合夥人 Email 對應表
 const INVESTOR_MAP = {
@@ -57,10 +57,10 @@ const formatPrice = (amount) => {
 };
 
 const formatOriginalMoney = (amount, isUS) => {
-  return new Intl.NumberFormat(isUS ? 'en-US' : 'zh-TW', { 
-    style: 'currency', 
-    currency: isUS ? 'USD' : 'TWD', 
-    maximumFractionDigits: isUS ? 2 : 0 
+  return new Intl.NumberFormat(isUS ? 'en-US' : 'zh-TW', {
+    style: 'currency',
+    currency: isUS ? 'USD' : 'TWD',
+    maximumFractionDigits: isUS ? 2 : 0
   }).format(safeNumber(amount));
 };
 
@@ -93,14 +93,14 @@ const Card = ({ children, className = "" }) => (
 export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [investors] = useState(['Yi', 'Ma']);
-  
+
   const [user, setUser] = useState(null);
   const [allowedEmails, setAllowedEmails] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const isAdmin = user && user.email === ADMIN_EMAIL;
   const isAllowed = user && (allowedEmails.includes(user?.email) || isAdmin);
-  
+
   const [funds, setFunds] = useState([]);
   const [trades, setTrades] = useState([]);
   const [marketPrices, setMarketPrices] = useState({});
@@ -143,7 +143,7 @@ export default function App() {
     if (!isAllowed) return "****";
     return formatMoney(amount);
   };
-  
+
   // 安全顯示單價
   const securePrice = (amount) => {
     if (isLoading) return <Skeleton className="h-6 w-16 inline-block" />;
@@ -219,7 +219,7 @@ export default function App() {
   };
 
   // --- 計算邏輯 ---
-  
+
   // 1. 取得匯率
   const exchangeRate = safeNumber(marketPrices['USDTWD']) || 32.5;
 
@@ -240,7 +240,7 @@ export default function App() {
 
   const portfolioStats = useMemo(() => {
     let cashBalance = capitalStats.totalCapital;
-    const holdings = {}; 
+    const holdings = {};
 
     // 先依照日期排序交易紀錄
     const sortedTrades = [...trades].sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -271,17 +271,17 @@ export default function App() {
     let marketValue = 0;
     const holdingsList = Object.keys(holdings).map(ticker => {
       const data = holdings[ticker];
-      if (data.qty <= 0) return null; 
+      if (data.qty <= 0) return null;
 
       const isUS = data.isUS;
       const rate = isUS ? exchangeRate : 1;
-      
+
       const currentPriceOriginal = safeNumber(marketPrices[ticker]) || (data.totalCostOriginal / (data.qty || 1));
-      
+
       const marketValueOriginal = data.qty * currentPriceOriginal;
       const currentValueTWD = marketValueOriginal * rate;
       marketValue += currentValueTWD;
-      
+
       const totalCostTWD = data.totalCostOriginal * rate;
       const avgCostOriginal = data.totalCostOriginal / (data.qty || 1);
       const unrealizedPL = currentValueTWD - totalCostTWD;
@@ -311,7 +311,7 @@ export default function App() {
     investors.forEach(inv => investorData[inv] = { invested: 0, units: 0 });
 
     const sortedFunds = [...funds].sort((a, b) => new Date(a.date) - new Date(b.date));
-    const enrichedFunds = []; 
+    const enrichedFunds = [];
 
     sortedFunds.forEach(f => {
       const amt = safeNumber(f.amount);
@@ -320,36 +320,36 @@ export default function App() {
       let calculatedBuyPrice = safeNumber(f.buyPrice);
 
       if (units <= 0 && calculatedBuyPrice <= 0) {
-         const prevHistory = historyData
-            .filter(h => h.date < f.date) 
-            .pop();
+        const prevHistory = historyData
+          .filter(h => h.date < f.date)
+          .pop();
 
-         if (prevHistory) {
-             let unitsAtSnapshot = 0;
-             enrichedFunds.forEach(ef => {
-                 if (ef.date <= prevHistory.date) {
-                     unitsAtSnapshot += ef.units;
-                 }
-             });
+        if (prevHistory) {
+          let unitsAtSnapshot = 0;
+          enrichedFunds.forEach(ef => {
+            if (ef.date <= prevHistory.date) {
+              unitsAtSnapshot += ef.units;
+            }
+          });
 
-             if (unitsAtSnapshot > 0) {
-                 const navAtTime = prevHistory.total / unitsAtSnapshot;
-                 calculatedBuyPrice = navAtTime;
-                 units = amt / navAtTime;
-             } else {
-                 calculatedBuyPrice = 10;
-                 units = amt / 10;
-             }
-         } else {
-             calculatedBuyPrice = 10;
-             units = amt / 10;
-         }
-      } else {
-          if (calculatedBuyPrice > 0 && units <= 0) {
-              units = amt / calculatedBuyPrice;
-          } else if (units > 0 && calculatedBuyPrice <= 0) {
-              calculatedBuyPrice = amt / units;
+          if (unitsAtSnapshot > 0) {
+            const navAtTime = prevHistory.total / unitsAtSnapshot;
+            calculatedBuyPrice = navAtTime;
+            units = amt / navAtTime;
+          } else {
+            calculatedBuyPrice = 10;
+            units = amt / 10;
           }
+        } else {
+          calculatedBuyPrice = 10;
+          units = amt / 10;
+        }
+      } else {
+        if (calculatedBuyPrice > 0 && units <= 0) {
+          units = amt / calculatedBuyPrice;
+        } else if (units > 0 && calculatedBuyPrice <= 0) {
+          calculatedBuyPrice = amt / units;
+        }
       }
 
       if (investorData[inv]) {
@@ -360,9 +360,9 @@ export default function App() {
       totalUnitsIssued += units;
 
       enrichedFunds.push({
-          ...f,
-          units, 
-          buyPrice: calculatedBuyPrice
+        ...f,
+        units,
+        buyPrice: calculatedBuyPrice
       });
     });
 
@@ -370,11 +370,11 @@ export default function App() {
     const totalAssets = portfolioStats.cashBalance + portfolioStats.marketValue;
     const currentUnitPrice = totalUnitsIssued > 0 ? (totalAssets / totalUnitsIssued) : 10;
 
-    return { 
-      totalInvestedCash, 
-      totalUnitsIssued, 
-      investorData, 
-      cashBalance, 
+    return {
+      totalInvestedCash,
+      totalUnitsIssued,
+      investorData,
+      cashBalance,
       totalAssets,
       currentUnitPrice,
       enrichedFunds
@@ -473,7 +473,7 @@ export default function App() {
             }
           }
         });
-        
+
         return {
           ...h,
           totalProfit: h.total - capTotal,
@@ -498,14 +498,14 @@ export default function App() {
 
         {isAllowed && (
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
-             <div className="flex items-center">
-               <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded mr-2">單位淨值法</span>
-               <span>當前淨值: <span className="font-bold text-slate-800">{formatPrice(unitStats.currentUnitPrice)}</span></span>
-             </div>
-             <div className="flex items-center">
-               <DollarSign className="w-3 h-3 mr-1" />
-               <span>美金參考匯率: <span className="text-slate-700 bg-white border border-slate-200 px-2 py-1 rounded shadow-sm ml-1">{exchangeRate}</span> TWD</span>
-             </div>
+            <div className="flex items-center">
+              <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded mr-2">單位淨值法</span>
+              <span>當前淨值: <span className="font-bold text-slate-800">{formatPrice(unitStats.currentUnitPrice)}</span></span>
+            </div>
+            <div className="flex items-center">
+              <DollarSign className="w-3 h-3 mr-1" />
+              <span>美金參考匯率: <span className="text-slate-700 bg-white border border-slate-200 px-2 py-1 rounded shadow-sm ml-1">{exchangeRate}</span> TWD</span>
+            </div>
           </div>
         )}
 
@@ -519,7 +519,7 @@ export default function App() {
                 </div>
                 {showProfitChart ? '純獲利趨勢' : '資產成長趨勢'}
               </h3>
-              
+
               {/* 切換開關 */}
               <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 self-start sm:self-auto">
                 <button
@@ -536,49 +536,49 @@ export default function App() {
                 </button>
               </div>
             </div>
-            
+
             <div className="h-[250px] w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData}>
                   <defs>
                     <linearGradient id="colorAsset" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorProfit" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis 
-                    dataKey="date" 
-                    tickFormatter={formatDateShort} 
-                    tick={{fontSize: 12, fill: '#64748b'}}
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={formatDateShort}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
                     axisLine={false}
                     tickLine={false}
                     dy={10}
                   />
-                  <YAxis 
-                    tickFormatter={(val) => `$${val/1000}k`}
-                    tick={{fontSize: 12, fill: '#64748b'}}
+                  <YAxis
+                    tickFormatter={(val) => `$${val / 1000}k`}
+                    tick={{ fontSize: 12, fill: '#64748b' }}
                     axisLine={false}
                     tickLine={false}
                     domain={['auto', 'auto']}
                   />
-                  <Tooltip 
+                  <Tooltip
                     contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                     formatter={(value) => [formatMoney(value), showProfitChart ? "純獲利" : "資產"]}
                     labelFormatter={(label) => `日期: ${label}`}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey={showProfitChart ? (isSpecificInvestor ? "meProfit" : "totalProfit") : (isSpecificInvestor ? currentInvestorName : "total")} 
+                  <Area
+                    type="monotone"
+                    dataKey={showProfitChart ? (isSpecificInvestor ? "meProfit" : "totalProfit") : (isSpecificInvestor ? currentInvestorName : "total")}
                     name={showProfitChart ? (isSpecificInvestor ? "我的獲利" : "總獲利") : (isSpecificInvestor ? "我的資產" : "總資產")}
-                    stroke={showProfitChart ? "#10b981" : "#3b82f6"} 
+                    stroke={showProfitChart ? "#10b981" : "#3b82f6"}
                     strokeWidth={3}
-                    fillOpacity={1} 
-                    fill={`url(#${showProfitChart ? 'colorProfit' : 'colorAsset'})`} 
+                    fillOpacity={1}
+                    fill={`url(#${showProfitChart ? 'colorProfit' : 'colorAsset'})`}
                   />
                 </AreaChart>
               </ResponsiveContainer>
@@ -595,13 +595,13 @@ export default function App() {
                 <h3 className="font-bold text-slate-800">歷史趨勢圖管理</h3>
               </div>
               <div className="flex gap-3 w-full md:w-auto">
-                <button 
+                <button
                   onClick={handleRecordHistory}
                   className="flex-1 md:flex-none bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 px-4 py-2 rounded-xl font-bold transition-all flex items-center justify-center text-sm"
                 >
                   <Plus className="w-4 h-4 mr-2" /> 記錄今日快照
                 </button>
-                <button 
+                <button
                   onClick={handleClearHistory}
                   className="flex-1 md:flex-none bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 px-4 py-2 rounded-xl font-bold transition-all flex items-center justify-center text-sm"
                 >
@@ -694,11 +694,11 @@ export default function App() {
                         </td>
                         <td className="py-4 whitespace-nowrap">{secureMoney(data.invested)}</td>
                         <td className="py-4 font-mono text-slate-500 whitespace-nowrap">
-                           {/* 修改: 使用 formatPrice 顯示小數點後兩位 */}
-                           {isAllowed ? formatPrice(avgCost) : "**"}
+                          {/* 修改: 使用 formatPrice 顯示小數點後兩位 */}
+                          {isAllowed ? formatPrice(avgCost) : "**"}
                         </td>
                         <td className="py-4 font-mono text-slate-500 whitespace-nowrap">
-                           {isAllowed ? new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(units) : "**"}
+                          {isAllowed ? new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(units) : "**"}
                         </td>
                         <td className="py-4 font-bold text-blue-600 whitespace-nowrap">{secureMoney(val)}</td>
                         <td className={`py-4 whitespace-nowrap pr-2 font-medium ${!isAllowed ? 'text-slate-600' : (pl >= 0 ? 'text-green-600' : 'text-red-600')}`}>
@@ -723,9 +723,9 @@ export default function App() {
               </div>
               <div className="mb-4">
                 <form onSubmit={handleAddEmail} className="flex gap-2">
-                  <input 
-                    type="email" 
-                    placeholder="輸入合夥人 Email" 
+                  <input
+                    type="email"
+                    placeholder="輸入合夥人 Email"
                     value={newEmail}
                     onChange={e => setNewEmail(e.target.value)}
                     className="flex-1 p-2.5 rounded-xl text-slate-900 outline-none border-2 border-slate-200 focus:border-blue-500 transition-all"
@@ -763,28 +763,58 @@ export default function App() {
     const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
     const [investor, setInvestor] = useState(investors[0]);
     const [amount, setAmount] = useState('');
+    // 新增狀態：判斷是入金還是提領
+    const [fundType, setFundType] = useState('DEPOSIT');
 
+    // 計算當下預估能買到/賣出的單位數 (顯示用)
     const estPrice = unitStats.currentUnitPrice;
-    const estUnits = amount ? (parseFloat(amount) / estPrice) : 0;
+    // 提領時顯示負數單位
+    const estUnits = amount ? ((fundType === 'WITHDRAW' ? -parseFloat(amount) : parseFloat(amount)) / estPrice) : 0;
+
+    // 取得當前選定投資人的最大可提領狀態
+    const currentInvestorData = unitStats.investorData[investor] || { units: 0, invested: 0 };
+    const maxWithdrawValue = currentInvestorData.units * unitStats.currentUnitPrice;
+
+    // 一鍵全數提領
+    const handleMaxWithdraw = () => {
+      setAmount(maxWithdrawValue.toFixed(0)); // 帶入總價值 (四捨五入到整數)
+    };
 
     const handleAddFund = async (e) => {
       e.preventDefault();
-      if (!amount || parseFloat(amount) <= 0) return;
-      
+      const numAmount = parseFloat(amount);
+      if (!numAmount || numAmount <= 0) return;
+
       const buyPrice = unitStats.currentUnitPrice;
-      const unitsBought = parseFloat(amount) / buyPrice;
+      const isWithdraw = fundType === 'WITHDRAW';
+      const finalAmount = isWithdraw ? -numAmount : numAmount;
+
+      // 如果是提領，檢查是否超過餘額
+      if (isWithdraw && numAmount > maxWithdrawValue + 1) { // +1 容許微小的小數點誤差
+        alert("提領金額不能大於該投資人的當前資產總值！");
+        return;
+      }
+
+      // 如果提領金額非常接近最大值 (例如誤差在1元以內)，視為「全數提領」，直接扣除他所有的單位數，避免小數點殘留
+      let unitsToTransact;
+      if (isWithdraw && Math.abs(numAmount - maxWithdrawValue) < 1) {
+        unitsToTransact = -currentInvestorData.units; // 完美歸零
+      } else {
+        unitsToTransact = finalAmount / buyPrice;
+      }
 
       try {
         await addDoc(collection(db, "funds"), {
           date,
           investor,
-          amount: parseFloat(amount),
-          buyPrice,      
-          units: unitsBought,
+          amount: finalAmount,
+          buyPrice,
+          units: unitsToTransact,
           createdAt: Date.now()
         });
         setAmount('');
-        alert(`入金成功！\n日期: ${date}\n成交淨值: ${formatMoney(buyPrice)}\n購入單位: ${new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(unitsBought)}`);
+        const actionName = isWithdraw ? '提領' : '入金';
+        alert(`${actionName}成功！\n日期: ${date}\n成交淨值: ${formatMoney(buyPrice)}\n${actionName}單位: ${new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(Math.abs(unitsToTransact))}`);
       } catch (error) {
         console.error("Error adding document: ", error);
         alert("寫入失敗");
@@ -807,30 +837,30 @@ export default function App() {
 
     // --- 手動修正淨值功能 ---
     const handleEditNav = async (fund) => {
-        if (!isAdmin) return;
-        const currentBuyPrice = safeNumber(fund.buyPrice) || 10;
-        const newNavStr = prompt(`修正 ${fund.date} 的成交淨值 (目前: ${currentBuyPrice.toFixed(2)})`, currentBuyPrice);
-        if (newNavStr === null) return;
-        
-        const newNav = parseFloat(newNavStr);
-        if (isNaN(newNav) || newNav <= 0) {
-            alert("請輸入有效的數字");
-            return;
-        }
+      if (!isAdmin) return;
+      const currentBuyPrice = safeNumber(fund.buyPrice) || 10;
+      const newNavStr = prompt(`修正 ${fund.date} 的成交淨值 (目前: ${currentBuyPrice.toFixed(2)})`, currentBuyPrice);
+      if (newNavStr === null) return;
 
-        // 重新計算單位數
-        const newUnits = fund.amount / newNav;
-        
-        try {
-            await updateDoc(doc(db, "funds", fund.id), {
-                buyPrice: newNav,
-                units: newUnits
-            });
-            alert("已更新淨值與單位數！");
-        } catch (error) {
-            console.error("Update failed", error);
-            alert("更新失敗");
-        }
+      const newNav = parseFloat(newNavStr);
+      if (isNaN(newNav) || newNav <= 0) {
+        alert("請輸入有效的數字");
+        return;
+      }
+
+      // 重新計算單位數
+      const newUnits = fund.amount / newNav;
+
+      try {
+        await updateDoc(doc(db, "funds", fund.id), {
+          buyPrice: newNav,
+          units: newUnits
+        });
+        alert("已更新淨值與單位數！");
+      } catch (error) {
+        console.error("Update failed", error);
+        alert("更新失敗");
+      }
     };
 
     return (
@@ -839,134 +869,190 @@ export default function App() {
           <div className="lg:col-span-1">
             <Card className="p-6 sticky top-6">
               <h3 className="font-bold text-slate-700 mb-6 flex items-center text-lg">
-                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg mr-3"><Plus className="w-5 h-5" /></div>
-                注入資金
+                <div className={`p-2 rounded-lg mr-3 ${fundType === 'DEPOSIT' ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                  {fundType === 'DEPOSIT' ? <Plus className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+                </div>
+                資金異動
               </h3>
-              
+
               <div className="bg-blue-50 p-4 rounded-xl mb-6 border border-blue-100">
                 <div className="flex justify-between items-center mb-2">
-                   <span className="text-xs font-bold text-slate-400">參考淨值狀態</span>
-                   <span className={`text-xs px-2 py-0.5 rounded ${funds.length === 0 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                     {funds.length === 0 ? '初始期 (固定 10)' : '營運期 (浮動)'}
-                   </span>
+                  <span className="text-xs font-bold text-slate-400">參考淨值狀態</span>
+                  <span className={`text-xs px-2 py-0.5 rounded ${funds.length === 0 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
+                    {funds.length === 0 ? '初始期 (固定 10)' : '營運期 (浮動)'}
+                  </span>
                 </div>
                 <div className="flex justify-between items-end">
-                   <div>
-                     <div className="text-xs text-slate-500 mb-1">預估成交價</div>
-                     <div className="text-xl font-bold text-slate-800">{formatMoney(estPrice)}</div>
-                   </div>
-                   <div className="text-right">
-                     <div className="text-xs text-slate-500 mb-1">預估購入單位</div>
-                     <div className="text-xl font-bold text-blue-600">{new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(estUnits)}</div>
-                   </div>
+                  <div>
+                    <div className="text-xs text-slate-500 mb-1">預估成交價</div>
+                    <div className="text-xl font-bold text-slate-800">{formatMoney(estPrice)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-500 mb-1">{fundType === 'DEPOSIT' ? '預估購入單位' : '預估註銷單位'}</div>
+                    <div className={`text-xl font-bold ${fundType === 'DEPOSIT' ? 'text-blue-600' : 'text-orange-600'}`}>
+                      {new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(estUnits)}
+                    </div>
+                  </div>
                 </div>
               </div>
 
               <form onSubmit={handleAddFund} className="space-y-5">
+                {/* 新增：入金/提領 切換按鈕 */}
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                  <button type="button" onClick={() => { setFundType('DEPOSIT'); setAmount(''); }} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${fundType === 'DEPOSIT' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                    入金 (Deposit)
+                  </button>
+                  <button type="button" onClick={() => { setFundType('WITHDRAW'); setAmount(''); }} className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all ${fundType === 'WITHDRAW' ? 'bg-white text-orange-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                    提領 (Withdraw)
+                  </button>
+                </div>
+
                 <div>
                   <label className="block text-sm font-bold text-slate-500 mb-2">日期</label>
                   <input type="date" required value={date} onChange={e => setDate(e.target.value)} className="input-field" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-500 mb-2">資金來源</label>
+                  <label className="block text-sm font-bold text-slate-500 mb-2">合夥人</label>
                   <select value={investor} onChange={e => setInvestor(e.target.value)} className="input-field">
                     {investors.map(i => <option key={i} value={i}>{i}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-slate-500 mb-2">金額 (TWD)</label>
-                  <input type="number" required value={amount} onChange={e => setAmount(e.target.value)} className="input-field" />
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-bold text-slate-500">金額 (TWD)</label>
+                    {fundType === 'WITHDRAW' && (
+                      <button 
+                        type="button" 
+                        onClick={handleMaxWithdraw}
+                        className="text-xs bg-orange-100 text-orange-600 px-2 py-1 rounded hover:bg-orange-200 font-bold transition-colors animate-fade-in"
+                      >
+                        全數提領
+                      </button>
+                    )}
+                  </div>
+                  <input 
+                    type="number" 
+                    required 
+                    min="1"
+                    value={amount} 
+                    onChange={e => setAmount(e.target.value)} 
+                    placeholder={fundType === 'WITHDRAW' ? `最多可提領 ${formatMoney(maxWithdrawValue)}` : "輸入正數金額"}
+                    className="input-field animate-fade-in" 
+                  />
+                  {fundType === 'WITHDRAW' && (
+                    <div className="text-[10px] text-slate-400 mt-1 text-right animate-fade-in">
+                      可提領餘額: {formatMoney(maxWithdrawValue)}
+                    </div>
+                  )}
                 </div>
-                <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-blue-200 transition-all active:scale-95">確認入金</button>
+                <button type="submit" className={`w-full text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all active:scale-95 ${fundType === 'DEPOSIT' ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200' : 'bg-orange-600 hover:bg-orange-700 shadow-orange-200'}`}>
+                  {fundType === 'DEPOSIT' ? '確認入金' : '確認提領出金'}
+                </button>
               </form>
             </Card>
           </div>
         ) : (
-           <div className="lg:col-span-1">
-             <div className="bg-slate-50 p-8 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400">
-               <Lock className="w-10 h-10 mx-auto mb-3 text-slate-300" />
-               <p>僅管理員可新增資金</p>
-             </div>
-           </div>
+          <div className="lg:col-span-1">
+            <div className="bg-slate-50 p-8 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400">
+              <Lock className="w-10 h-10 mx-auto mb-3 text-slate-300" />
+              <p>僅管理員可新增資金</p>
+            </div>
+          </div>
         )}
 
         <div className="lg:col-span-2">
           <Card className="overflow-hidden">
             <div className="p-4 border-b border-slate-100 bg-slate-50/50">
               <h3 className="font-bold text-slate-700 flex items-center">
-                <Wallet className="w-4 h-4 mr-2 text-slate-400" /> 入金紀錄
+                <Wallet className="w-4 h-4 mr-2 text-slate-400" /> 資金異動紀錄
               </h3>
             </div>
-            
+
             <div className="hidden md:block overflow-x-auto p-6">
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-slate-400 text-sm border-b border-slate-100">
                     <th className="pb-3 font-medium whitespace-nowrap pl-2">日期</th>
                     <th className="pb-3 font-medium whitespace-nowrap">投資人</th>
+                    <th className="pb-3 font-medium whitespace-nowrap">類別</th>
                     <th className="pb-3 font-medium text-right whitespace-nowrap pr-4">金額</th>
                     <th className="pb-3 font-medium text-right whitespace-nowrap pr-4">成交淨值</th>
-                    <th className="pb-3 font-medium text-right whitespace-nowrap pr-4">購入單位</th>
+                    <th className="pb-3 font-medium text-right whitespace-nowrap pr-4">單位數</th>
                     {isAdmin && <th className="pb-3 font-medium w-16 text-center whitespace-nowrap">操作</th>}
                   </tr>
                 </thead>
                 <tbody className="text-slate-600">
-                  {/* 使用 unitStats.enrichedFunds 確保顯示計算後的完整資料 */}
-                  {[...unitStats.enrichedFunds].reverse().map(f => (
-                    <tr key={f.id} className="hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0">
-                      <td className="py-4 text-sm whitespace-nowrap pl-2">{f.date}</td>
-                      <td className="py-4 font-medium whitespace-nowrap">
-                        <span className="bg-slate-100 px-2 py-1 rounded text-xs text-slate-600">{f.investor}</span>
-                      </td>
-                      <td className="py-4 text-right font-mono text-slate-800 whitespace-nowrap pr-4">{secureMoney(f.amount)}</td>
-                      <td className="py-4 text-right font-mono text-slate-500 whitespace-nowrap pr-4 text-sm group cursor-pointer" onClick={() => handleEditNav(f)}>
-                        <div className="flex items-center justify-end">
-                            {/* 修改: 使用 formatPrice 顯示小數點後兩位 */}
+                  {[...unitStats.enrichedFunds].reverse().map(f => {
+                    const isWithdraw = f.amount < 0;
+                    return (
+                      <tr key={f.id} className={`hover:bg-slate-50 transition-colors border-b border-slate-50 last:border-0 ${isWithdraw ? 'bg-orange-50/30' : ''}`}>
+                        <td className="py-4 text-sm whitespace-nowrap pl-2">{f.date}</td>
+                        <td className="py-4 font-medium whitespace-nowrap">
+                          <span className="bg-slate-100 px-2 py-1 rounded text-xs text-slate-600">{f.investor}</span>
+                        </td>
+                        <td className="py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${isWithdraw ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                            {isWithdraw ? '提領' : '入金'}
+                          </span>
+                        </td>
+                        <td className={`py-4 text-right font-mono whitespace-nowrap pr-4 ${isWithdraw ? 'text-orange-600' : 'text-slate-800'}`}>
+                          {secureMoney(f.amount)}
+                        </td>
+                        <td className="py-4 text-right font-mono text-slate-500 whitespace-nowrap pr-4 text-sm group cursor-pointer" onClick={() => handleEditNav(f)}>
+                          <div className="flex items-center justify-end">
                             {formatPrice(f.buyPrice)}
                             {isAdmin && <Pencil className="w-3 h-3 ml-2 opacity-0 group-hover:opacity-100 text-blue-400" />}
-                        </div>
-                      </td>
-                      <td className="py-4 text-right font-mono text-slate-500 whitespace-nowrap pr-4 text-sm">
-                        {formatUnit(f.units)}
-                      </td>
-                      {isAdmin && (
-                        <td className="py-4 text-center whitespace-nowrap">
-                          <button onClick={() => handleDelete(f.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          </div>
                         </td>
-                      )}
-                    </tr>
-                  ))}
+                        <td className={`py-4 text-right font-mono whitespace-nowrap pr-4 text-sm ${isWithdraw ? 'text-orange-600' : 'text-slate-500'}`}>
+                          {formatUnit(f.units)}
+                        </td>
+                        {isAdmin && (
+                          <td className="py-4 text-center whitespace-nowrap">
+                            <button onClick={() => handleDelete(f.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    )
+                  })}
                   {unitStats.enrichedFunds.length === 0 && (
-                    <tr><td colSpan={isAdmin ? 6 : 5} className="p-8 text-center text-slate-400">目前無紀錄</td></tr>
+                    <tr><td colSpan={isAdmin ? 7 : 6} className="p-8 text-center text-slate-400">目前無紀錄</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
 
             <div className="md:hidden p-4 space-y-3">
-              {[...unitStats.enrichedFunds].reverse().map(f => (
-                <div key={f.id} className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex justify-between items-center">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-slate-700">{f.investor}</span>
-                      <span className="text-xs text-slate-400">{f.date}</span>
+              {[...unitStats.enrichedFunds].reverse().map(f => {
+                const isWithdraw = f.amount < 0;
+                return (
+                  <div key={f.id} className={`bg-slate-50 p-4 rounded-xl border flex justify-between items-center ${isWithdraw ? 'border-orange-200 bg-orange-50/50' : 'border-slate-100'}`}>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isWithdraw ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {isWithdraw ? '提領' : '入金'}
+                        </span>
+                        <span className="font-bold text-slate-700">{f.investor}</span>
+                        <span className="text-xs text-slate-400">{f.date}</span>
+                      </div>
+                      <div className={`font-mono font-bold ${isWithdraw ? 'text-orange-600' : 'text-slate-800'}`}>
+                        {secureMoney(f.amount)}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-1 flex gap-3 items-center" onClick={() => handleEditNav(f)}>
+                        <span className="flex items-center">淨值: {formatPrice(f.buyPrice)} {isAdmin && <Pencil className="w-3 h-3 ml-1 text-slate-300" />}</span>
+                        <span>單位: {formatUnit(f.units)}</span>
+                      </div>
                     </div>
-                    <div className="font-mono text-slate-800 font-bold">{secureMoney(f.amount)}</div>
-                    <div className="text-xs text-slate-400 mt-1 flex gap-3 items-center" onClick={() => handleEditNav(f)}>
-                       {/* 修改: 使用 formatPrice 顯示小數點後兩位 */}
-                       <span className="flex items-center">淨值: {formatPrice(f.buyPrice)} {isAdmin && <Pencil className="w-3 h-3 ml-1 text-slate-300" />}</span>
-                       <span>單位: {formatUnit(f.units)}</span>
-                    </div>
+                    {isAdmin && (
+                      <button onClick={() => handleDelete(f.id)} className="p-2 text-slate-300 hover:text-red-500">
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    )}
                   </div>
-                  {isAdmin && (
-                    <button onClick={() => handleDelete(f.id)} className="p-2 text-slate-300 hover:text-red-500">
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  )}
-                </div>
-              ))}
+                )
+              })}
               {unitStats.enrichedFunds.length === 0 && <div className="text-center text-slate-400 py-8">目前無紀錄</div>}
             </div>
           </Card>
@@ -997,50 +1083,50 @@ export default function App() {
         setTicker(''); setPrice(''); setQty('');
       } catch (error) { console.error(error); }
     };
-    const handleDelete = async (id) => { if(window.confirm("刪除？")) await deleteDoc(doc(db, "trades", id)); };
+    const handleDelete = async (id) => { if (window.confirm("刪除？")) await deleteDoc(doc(db, "trades", id)); };
 
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {isAdmin ? (
           <div className="lg:col-span-1">
             <Card className="p-6 sticky top-6">
-              <h3 className="font-bold text-slate-700 mb-6 flex items-center text-lg"><div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg mr-3"><TrendingUp className="w-5 h-5"/></div>紀錄交易</h3>
+              <h3 className="font-bold text-slate-700 mb-6 flex items-center text-lg"><div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg mr-3"><TrendingUp className="w-5 h-5" /></div>紀錄交易</h3>
               {/* 修正：使用 portfolioStats.cashBalance 顯示正確的現金餘額 */}
               <div className="mb-5 p-4 bg-slate-50 rounded-xl border border-slate-100"><span className="text-xs font-bold text-slate-400 uppercase block mb-1">可用現金餘額</span><span className="font-mono text-xl font-bold text-slate-700">{secureMoney(portfolioStats.cashBalance)}</span></div>
               <form onSubmit={handleAddTrade} className="space-y-5">
-                <div className="flex bg-slate-100 p-1 rounded-xl"><button type="button" onClick={()=>setType('BUY')} className={`flex-1 py-2 rounded-lg font-bold text-sm ${type==='BUY'?'bg-white text-red-600 shadow-sm':'text-slate-400'}`}>買入</button><button type="button" onClick={()=>setType('SELL')} className={`flex-1 py-2 rounded-lg font-bold text-sm ${type==='SELL'?'bg-white text-green-600 shadow-sm':'text-slate-400'}`}>賣出</button></div>
-                <div><label className="block text-sm font-bold text-slate-500 mb-2">日期</label><input type="date" value={date} onChange={e=>setDate(e.target.value)} className="input-field"/></div>
-                <div><label className="block text-sm font-bold text-slate-500 mb-2">代號</label><input type="text" value={ticker} onChange={e=>setTicker(e.target.value)} className="input-field uppercase" placeholder="如: 2330"/></div>
-                <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-slate-500 mb-2">價格</label><input type="number" step="0.01" value={price} onChange={e=>setPrice(e.target.value)} className="input-field"/></div><div><label className="block text-sm font-bold text-slate-500 mb-2">股數</label><input type="number" step="1" value={qty} onChange={e=>setQty(e.target.value)} className="input-field"/></div></div>
+                <div className="flex bg-slate-100 p-1 rounded-xl"><button type="button" onClick={() => setType('BUY')} className={`flex-1 py-2 rounded-lg font-bold text-sm ${type === 'BUY' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-400'}`}>買入</button><button type="button" onClick={() => setType('SELL')} className={`flex-1 py-2 rounded-lg font-bold text-sm ${type === 'SELL' ? 'bg-white text-green-600 shadow-sm' : 'text-slate-400'}`}>賣出</button></div>
+                <div><label className="block text-sm font-bold text-slate-500 mb-2">日期</label><input type="date" value={date} onChange={e => setDate(e.target.value)} className="input-field" /></div>
+                <div><label className="block text-sm font-bold text-slate-500 mb-2">代號</label><input type="text" value={ticker} onChange={e => setTicker(e.target.value)} className="input-field uppercase" placeholder="如: 2330" /></div>
+                <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-slate-500 mb-2">價格</label><input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="input-field" /></div><div><label className="block text-sm font-bold text-slate-500 mb-2">股數</label><input type="number" step="1" value={qty} onChange={e => setQty(e.target.value)} className="input-field" /></div></div>
                 <button type="submit" className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-4 rounded-xl">新增紀錄</button>
               </form>
             </Card>
           </div>
-        ) : <div className="lg:col-span-1"><div className="bg-slate-50 p-8 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400"><Lock className="w-10 h-10 mx-auto mb-3 text-slate-300"/><p>僅管理員可操作</p></div></div>}
+        ) : <div className="lg:col-span-1"><div className="bg-slate-50 p-8 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400"><Lock className="w-10 h-10 mx-auto mb-3 text-slate-300" /><p>僅管理員可操作</p></div></div>}
         <div className="lg:col-span-2">
-           <Card className="overflow-hidden">
-            <div className="p-4 border-b border-slate-100 bg-slate-50"><h3 className="font-bold text-slate-700 flex items-center"><Activity className="w-4 h-4 mr-2 text-slate-400"/> 交易歷史</h3></div>
+          <Card className="overflow-hidden">
+            <div className="p-4 border-b border-slate-100 bg-slate-50"><h3 className="font-bold text-slate-700 flex items-center"><Activity className="w-4 h-4 mr-2 text-slate-400" /> 交易歷史</h3></div>
             {/* Desktop View */}
             <div className="hidden md:block overflow-x-auto p-6">
               <table className="w-full text-left">
                 <thead><tr className="text-slate-400 text-sm border-b"><th className="pb-3 pl-2">日期</th><th className="pb-3">代號</th><th className="pb-3">類別</th><th className="pb-3 text-right">成交價</th><th className="pb-3 text-right">股數</th><th className="pb-3 text-right pr-4">總額</th>{isAdmin && <th className="pb-3 text-center">操作</th>}</tr></thead>
                 <tbody className="text-slate-600">
-                  {[...trades].sort((a,b)=>new Date(b.date)-new Date(a.date)).map(t=>(
+                  {[...trades].sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => (
                     <tr key={t.id} className="hover:bg-slate-50 border-b last:border-0">
                       <td className="py-4 pl-2 text-sm">{t.date}</td><td className="py-4 font-bold">{t.ticker}</td>
-                      <td className="py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${t.type==='BUY'?'bg-red-100 text-red-600':'bg-green-100 text-green-600'}`}>{t.type==='BUY'?'買':'賣'}</span></td>
-                      <td className="py-4 text-right">{t.price}</td><td className="py-4 text-right">{t.qty}</td><td className="py-4 text-right font-mono text-slate-800 pr-4">{secureMoney(t.price*t.qty)}</td>
-                      {isAdmin && <td className="py-4 text-center"><button onClick={()=>handleDelete(t.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4"/></button></td>}
+                      <td className="py-4"><span className={`px-2 py-1 rounded text-xs font-bold ${t.type === 'BUY' ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>{t.type === 'BUY' ? '買' : '賣'}</span></td>
+                      <td className="py-4 text-right">{t.price}</td><td className="py-4 text-right">{t.qty}</td><td className="py-4 text-right font-mono text-slate-800 pr-4">{secureMoney(t.price * t.qty)}</td>
+                      {isAdmin && <td className="py-4 text-center"><button onClick={() => handleDelete(t.id)} className="p-2 text-slate-300 hover:text-red-500"><Trash2 className="w-4 h-4" /></button></td>}
                     </tr>
                   ))}
-                  {trades.length===0 && <tr><td colSpan="7" className="p-8 text-center text-slate-400">無紀錄</td></tr>}
+                  {trades.length === 0 && <tr><td colSpan="7" className="p-8 text-center text-slate-400">無紀錄</td></tr>}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Card View - 交易紀錄 (優化版) */}
             <div className="md:hidden p-4 space-y-3">
-              {[...trades].sort((a,b) => new Date(b.date) - new Date(a.date)).map(t => (
+              {[...trades].sort((a, b) => new Date(b.date) - new Date(a.date)).map(t => (
                 <div key={t.id} className="bg-slate-50 p-4 rounded-xl border border-slate-100">
                   {/* 第一行: 股票代號與日期 */}
                   <div className="flex justify-between items-center mb-2">
@@ -1052,7 +1138,7 @@ export default function App() {
                     </div>
                     <span className="text-xs text-slate-400 bg-white px-2 py-1 rounded-md border border-slate-100">{t.date}</span>
                   </div>
-                  
+
                   {/* 第二行: 詳細數據 grid */}
                   <div className="grid grid-cols-2 gap-2 text-sm border-t border-slate-200 pt-2 mt-2">
                     <div className="text-slate-500">成交價: <span className="text-slate-700">{t.price}</span></div>
@@ -1086,7 +1172,7 @@ export default function App() {
     const handlePriceChange = (ticker, val) => setPriceInputs(prev => ({ ...prev, [ticker]: val }));
     const savePrices = async () => {
       const newPrices = { ...marketPrices };
-      Object.keys(priceInputs).forEach(k => { if(priceInputs[k]) newPrices[k] = parseFloat(priceInputs[k]); });
+      Object.keys(priceInputs).forEach(k => { if (priceInputs[k]) newPrices[k] = parseFloat(priceInputs[k]); });
       try { await setDoc(doc(db, "settings", "market_prices"), newPrices); setSavedMsg(true); setTimeout(() => setSavedMsg(false), 2000); } catch (e) { console.error(e); }
     };
 
@@ -1094,97 +1180,109 @@ export default function App() {
       <div className="space-y-6">
         {isAllowed && (
           <Card className="p-6">
-             <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center"><div className="p-2 bg-purple-100 text-purple-600 rounded-lg mr-3"><PieChartIcon className="w-5 h-5"/></div>資產配置 (台幣)</h3>
-             <div className="h-[300px] flex items-center justify-center">
-                {allocationData.length > 0 ? (
-                  <ResponsiveContainer><PieChart><Pie data={allocationData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} fill="#8884d8" paddingAngle={5} dataKey="value">{allocationData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip formatter={(v,n)=>{const total=allocationData.reduce((a,c)=>a+c.value,0);return [`${formatMoney(v)} (${formatPercent(total>0?v/total:0)})`,n];}} /><Legend /></PieChart></ResponsiveContainer>
-                ) : <p className="text-slate-400">無資產數據</p>}
-             </div>
+            <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center"><div className="p-2 bg-purple-100 text-purple-600 rounded-lg mr-3"><PieChartIcon className="w-5 h-5" /></div>資產配置 (台幣)</h3>
+            <div className="h-[300px] flex items-center justify-center">
+              {allocationData.length > 0 ? (
+                <ResponsiveContainer><PieChart><Pie data={allocationData} cx="50%" cy="50%" innerRadius={60} outerRadius={100} fill="#8884d8" paddingAngle={5} dataKey="value">{allocationData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip formatter={(v, n) => { const total = allocationData.reduce((a, c) => a + c.value, 0); return [`${formatMoney(v)} (${formatPercent(total > 0 ? v / total : 0)})`, n]; }} /><Legend /></PieChart></ResponsiveContainer>
+              ) : <p className="text-slate-400">無資產數據</p>}
+            </div>
           </Card>
         )}
         <Card className="p-6">
-           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div><h3 className="text-xl font-bold text-slate-800">持倉損益表 (TWD)</h3><p className="text-slate-500 text-sm">金額已換算台幣</p></div>
-            {isAdmin && <button onClick={savePrices} className={`flex items-center px-4 py-2 rounded-xl font-medium transition-all shadow-lg ${savedMsg?'bg-green-600 text-white':'bg-indigo-600 hover:bg-indigo-700 text-white'}`}>{savedMsg ? '已同步!' : <><Save className="w-4 h-4 mr-2"/> 更新市價</>}</button>}
-           </div>
-           
-           {/* Desktop Table */}
-           <div className="hidden md:block overflow-x-auto">
-             <table className="w-full text-left">
-              <thead><tr className="text-slate-400 text-sm border-b"><th className="pb-3 pl-4">代號</th><th className="pb-3 text-right">股數</th><th className="pb-3 text-right">幣別</th><th className="pb-3 text-right w-40">現價(原幣)</th><th className="pb-3 text-right">市值(TWD)</th><th className="pb-3 text-right">損益(TWD)</th><th className="pb-3 text-right pr-4">報酬率</th></tr></thead>
+            {isAdmin && <button onClick={savePrices} className={`flex items-center px-4 py-2 rounded-xl font-medium transition-all shadow-lg ${savedMsg ? 'bg-green-600 text-white' : 'bg-indigo-600 hover:bg-indigo-700 text-white'}`}>{savedMsg ? '已同步!' : <><Save className="w-4 h-4 mr-2" /> 更新市價</>}</button>}
+          </div>
+
+          {/* Desktop Table */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-slate-400 text-sm border-b">
+                  <th className="pb-4 pl-4 pr-2">代號</th>
+                  <th className="pb-4 px-4 text-right">股數</th>
+                  <th className="pb-4 px-4 text-right">幣別</th>
+                  <th className="pb-4 px-4 text-right">成本均價</th>
+                  <th className="pb-4 px-4 text-right w-32">現價(原幣)</th>
+                  <th className="pb-4 px-4 text-right">市值(TWD)</th>
+                  <th className="pb-4 px-4 text-right">損益(TWD)</th>
+                  <th className="pb-4 pl-2 pr-4 text-right">報酬率</th>
+                </tr>
+              </thead>
               <tbody className="text-slate-600">
                 {portfolioStats.holdingsList.map(item => (
                   <tr key={item.ticker} className="hover:bg-slate-50 border-b last:border-0">
-                    <td className="py-4 pl-4 font-bold text-slate-800"><div className="flex items-center gap-2">{item.ticker}<span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.returnRate>=0?'bg-green-100 text-green-600':'bg-red-100 text-red-600'}`}>{item.returnRate>=0?'獲利':'虧損'}</span></div></td>
-                    <td className="py-4 text-right">{item.qty}</td>
-                    <td className="py-4 text-right text-xs text-slate-500">{item.isUS?<span className="bg-blue-100 text-blue-600 px-2 py-1 rounded">USD</span>:<span className="bg-slate-100 text-slate-600 px-2 py-1 rounded">TWD</span>}</td>
-                    <td className="py-4 text-right"><input type="number" step="0.1" disabled={!isAdmin} value={priceInputs[item.ticker]||''} onChange={e=>handlePriceChange(item.ticker,e.target.value)} placeholder={item.avgCostOriginal.toFixed(1)} className={`input-field w-24 text-right ${isAdmin?'bg-indigo-50/50 border-indigo-200':'bg-transparent border-transparent'}`}/></td>
-                    <td className="py-4 text-right font-medium text-slate-800">{secureMoney(item.currentValue)}</td>
-                    <td className={`py-4 text-right font-medium ${!isAllowed?'text-slate-600':(item.unrealizedPL>=0?'text-green-600':'text-red-600')}`}>{isAllowed&&(item.unrealizedPL>=0?'+':'')}{secureMoney(item.unrealizedPL)}</td>
-                    <td className={`py-4 text-right pr-4 font-bold ${!isAllowed?'text-slate-600':(item.returnRate>=0?'text-green-600':'text-red-600')}`}>{isAllowed?formatPercent(item.returnRate):"****"}</td>
+                    <td className="py-5 pl-4 pr-2 font-bold text-slate-800"><div className="flex items-center gap-2">{item.ticker}<span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${item.returnRate >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>{item.returnRate >= 0 ? '獲利' : '虧損'}</span></div></td>
+                    <td className="py-5 px-4 text-right">{item.qty}</td>
+                    <td className="py-5 px-4 text-right text-xs text-slate-500">{item.isUS ? <span className="bg-blue-100 text-blue-600 px-2 py-1 rounded">USD</span> : <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded">TWD</span>}</td>
+                    <td className="py-5 px-4 text-right font-mono text-slate-600">{formatOriginalMoney(item.avgCostOriginal, item.isUS)}</td>
+                    <td className="py-5 px-4 text-right"><input type="number" step="0.1" disabled={!isAdmin} value={priceInputs[item.ticker] || ''} onChange={e => handlePriceChange(item.ticker, e.target.value)} placeholder={item.avgCostOriginal.toFixed(1)} className={`input-field w-24 text-right ${isAdmin ? 'bg-indigo-50/50 border-indigo-200' : 'bg-transparent border-transparent'}`} /></td>
+                    <td className="py-5 px-4 text-right font-medium text-slate-800">{secureMoney(item.currentValue)}</td>
+                    <td className={`py-5 px-4 text-right font-medium ${!isAllowed ? 'text-slate-600' : (item.unrealizedPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>{isAllowed && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}</td>
+                    <td className={`py-5 pl-2 pr-4 text-right font-bold ${!isAllowed ? 'text-slate-600' : (item.returnRate >= 0 ? 'text-green-600' : 'text-red-600')}`}>{isAllowed ? formatPercent(item.returnRate) : "****"}</td>
                   </tr>
                 ))}
-                {portfolioStats.holdingsList.length===0 && <tr><td colSpan="7" className="p-8 text-center text-slate-400">無持倉</td></tr>}
+                {portfolioStats.holdingsList.length === 0 && <tr><td colSpan="8" className="p-8 text-center text-slate-400">無持倉</td></tr>}
               </tbody>
-             </table>
-           </div>
+            </table>
+          </div>
 
-           {/* Mobile Card View - 持倉損益 (新增：3欄佈局) */}
-           <div className="md:hidden space-y-4 mt-4">
-              {portfolioStats.holdingsList.map(item => (
-                <div key={item.ticker} className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
-                  {/* 頭部：代號與狀態 */}
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-2">
-                       <span className="text-lg font-bold text-slate-800">{item.ticker}</span>
-                       <span className="text-xs bg-slate-200 px-2 py-0.5 rounded text-slate-600">{item.isUS ? 'USD' : 'TWD'}</span>
-                    </div>
-                    <span className={`text-xs px-2 py-1 rounded font-bold ${item.returnRate >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                      {isAllowed ? formatPercent(item.returnRate) : "****"}
-                    </span>
+          {/* Mobile Card View - 持倉損益 (新增：3欄佈局) */}
+          <div className="md:hidden space-y-4 mt-4">
+            {portfolioStats.holdingsList.map(item => (
+              <div key={item.ticker} className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+                {/* 頭部：代號與狀態 */}
+                <div className="flex justify-between items-center mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold text-slate-800">{item.ticker}</span>
+                    <span className="text-xs bg-slate-200 px-2 py-0.5 rounded text-slate-600">{item.isUS ? 'USD' : 'TWD'}</span>
                   </div>
+                  <span className={`text-xs px-2 py-1 rounded font-bold ${item.returnRate >= 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {isAllowed ? formatPercent(item.returnRate) : "****"}
+                  </span>
+                </div>
 
-                  {/* 數據 Grid (3 columns) */}
-                  <div className="grid grid-cols-3 gap-2 text-sm mt-3">
-                    <div className="bg-white p-2 rounded-lg border border-slate-100 flex flex-col justify-center">
-                      <div className="text-slate-400 text-[10px] mb-1">持有股數</div>
-                      <div className="font-medium text-slate-700">{item.qty}</div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg border border-slate-100 flex flex-col justify-center">
-                      <div className="text-slate-400 text-[10px] mb-1">成本均價</div>
-                      <div className="font-medium text-slate-700">{formatOriginalMoney(item.avgCostOriginal, item.isUS)}</div>
-                    </div>
-                    <div className="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-center">
-                      <div className="text-slate-400 text-[10px] mb-1">現價</div>
-                       <input 
-                        type="number" 
-                        step="0.1" 
-                        disabled={!isAdmin} 
-                        value={priceInputs[item.ticker]||''} 
-                        onChange={e=>handlePriceChange(item.ticker,e.target.value)} 
-                        placeholder={item.avgCostOriginal.toFixed(1)} 
-                        className={`w-full outline-none font-bold text-sm ${isAdmin ? 'text-indigo-600' : 'text-slate-600 bg-transparent'}`}
-                      />
-                    </div>
+                {/* 數據 Grid (3 columns) */}
+                <div className="grid grid-cols-3 gap-2 text-sm mt-3">
+                  <div className="bg-white p-2 rounded-lg border border-slate-100 flex flex-col justify-center">
+                    <div className="text-slate-400 text-[10px] mb-1">持有股數</div>
+                    <div className="font-medium text-slate-700">{item.qty}</div>
                   </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-100 flex flex-col justify-center">
+                    <div className="text-slate-400 text-[10px] mb-1">成本均價</div>
+                    <div className="font-medium text-slate-700">{formatOriginalMoney(item.avgCostOriginal, item.isUS)}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-center">
+                    <div className="text-slate-400 text-[10px] mb-1">現價</div>
+                    <input
+                      type="number"
+                      step="0.1"
+                      disabled={!isAdmin}
+                      value={priceInputs[item.ticker] || ''}
+                      onChange={e => handlePriceChange(item.ticker, e.target.value)}
+                      placeholder={item.avgCostOriginal.toFixed(1)}
+                      className={`w-full outline-none font-bold text-sm ${isAdmin ? 'text-indigo-600' : 'text-slate-600 bg-transparent'}`}
+                    />
+                  </div>
+                </div>
 
-                  {/* 底部總結：市值與損益 */}
-                  <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
-                    <div>
-                      <div className="text-xs text-slate-400">市值 (TWD)</div>
-                      <div className="font-bold text-slate-800 text-lg">{secureMoney(item.currentValue)}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xs text-slate-400">損益 (TWD)</div>
-                      <div className={`font-bold text-lg ${!isAllowed?'text-slate-600':(item.unrealizedPL>=0?'text-green-600':'text-red-600')}`}>
-                        {isAllowed && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}
-                      </div>
+                {/* 底部總結：市值與損益 */}
+                <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
+                  <div>
+                    <div className="text-xs text-slate-400">市值 (TWD)</div>
+                    <div className="font-bold text-slate-800 text-lg">{secureMoney(item.currentValue)}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-400">損益 (TWD)</div>
+                    <div className={`font-bold text-lg ${!isAllowed ? 'text-slate-600' : (item.unrealizedPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
+                      {isAllowed && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}
                     </div>
                   </div>
                 </div>
-              ))}
-              {portfolioStats.holdingsList.length === 0 && <div className="text-center text-slate-400 py-8">無持倉</div>}
-           </div>
+              </div>
+            ))}
+            {portfolioStats.holdingsList.length === 0 && <div className="text-center text-slate-400 py-8">無持倉</div>}
+          </div>
 
         </Card>
       </div>
@@ -1192,7 +1290,7 @@ export default function App() {
   };
 
   const renderContent = () => {
-    switch(activeTab) {
+    switch (activeTab) {
       case 'dashboard': return <Dashboard />;
       case 'funds': return <FundManager />;
       case 'trade': return <TradeManager />;
@@ -1216,20 +1314,20 @@ export default function App() {
         </div>
         <div className="hidden md:block p-6 border-t border-slate-100">
           {user ? (
-             <div className="space-y-4">
-               <div className="flex items-center text-xs text-slate-500 bg-white p-3 rounded-xl border border-slate-200">
-                 <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3">{user.displayName?.[0] || 'U'}</div>
-                 <div className="flex-1 min-w-0"><div className="truncate font-bold text-slate-700">{user.displayName || 'User'}</div><div className="truncate text-[10px]">{user.email}</div></div>
-               </div>
-               <button onClick={handleLogout} className="w-full flex items-center justify-center text-xs text-red-500 hover:text-red-600 hover:bg-red-50 py-2 rounded-lg font-medium transition-colors"><LogOut className="w-3 h-3 mr-2" /> 登出帳號</button>
-             </div>
+            <div className="space-y-4">
+              <div className="flex items-center text-xs text-slate-500 bg-white p-3 rounded-xl border border-slate-200">
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold mr-3">{user.displayName?.[0] || 'U'}</div>
+                <div className="flex-1 min-w-0"><div className="truncate font-bold text-slate-700">{user.displayName || 'User'}</div><div className="truncate text-[10px]">{user.email}</div></div>
+              </div>
+              <button onClick={handleLogout} className="w-full flex items-center justify-center text-xs text-red-500 hover:text-red-600 hover:bg-red-50 py-2 rounded-lg font-medium transition-colors"><LogOut className="w-3 h-3 mr-2" /> 登出帳號</button>
+            </div>
           ) : <button onClick={handleLogin} className="w-full flex items-center justify-center bg-slate-800 hover:bg-slate-900 text-white py-3 rounded-xl text-xs font-bold transition-all shadow-lg active:scale-95"><LogIn className="w-3 h-3 mr-2" /> Google 登入</button>}
         </div>
       </nav>
 
       <div className="md:hidden flex items-center justify-between p-4 bg-white sticky top-0 z-40 border-b border-slate-200 shadow-sm">
-         <div className="flex items-center"><div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 text-lg shadow-md">$</div><span className="text-lg font-bold text-slate-800">InvestPartner</span></div>
-         <div>{user ? <button onClick={handleLogout} className="bg-slate-100 p-2 rounded-full text-slate-600"><LogOut className="w-5 h-5" /></button> : <button onClick={handleLogin} className="bg-slate-800 p-2 rounded-full text-white"><LogIn className="w-5 h-5" /></button>}</div>
+        <div className="flex items-center"><div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold mr-3 text-lg shadow-md">$</div><span className="text-lg font-bold text-slate-800">InvestPartner</span></div>
+        <div>{user ? <button onClick={handleLogout} className="bg-slate-100 p-2 rounded-full text-slate-600"><LogOut className="w-5 h-5" /></button> : <button onClick={handleLogin} className="bg-slate-800 p-2 rounded-full text-white"><LogIn className="w-5 h-5" /></button>}</div>
       </div>
 
       <main className="pt-6 px-4 md:px-10 max-w-7xl mx-auto md:pl-72 transition-all duration-300">
@@ -1252,11 +1350,11 @@ export default function App() {
 
       {deleteModal.show && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] backdrop-blur-sm p-4">
-            <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-fade-in border border-slate-100 transform scale-100 transition-all">
-                <div className="flex items-center mb-4 text-red-600 bg-red-50 p-3 rounded-xl w-fit"><AlertCircle className="w-6 h-6 mr-2" /><h3 className="font-bold text-lg">確認刪除</h3></div>
-                <p className="text-slate-600 mb-6 text-sm leading-relaxed">{deleteModal.message}</p>
-                <div className="flex justify-end space-x-3"><button onClick={() => setDeleteModal({ ...deleteModal, show: false })} className="px-5 py-2.5 text-slate-500 hover:bg-slate-50 font-bold rounded-xl transition-colors text-sm">取消</button><button onClick={() => { if (deleteModal.onConfirm) deleteModal.onConfirm(); setDeleteModal({ ...deleteModal, show: false }); }} className="px-5 py-2.5 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg transition-transform active:scale-95 text-sm">確認刪除</button></div>
-            </div>
+          <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full animate-fade-in border border-slate-100 transform scale-100 transition-all">
+            <div className="flex items-center mb-4 text-red-600 bg-red-50 p-3 rounded-xl w-fit"><AlertCircle className="w-6 h-6 mr-2" /><h3 className="font-bold text-lg">確認刪除</h3></div>
+            <p className="text-slate-600 mb-6 text-sm leading-relaxed">{deleteModal.message}</p>
+            <div className="flex justify-end space-x-3"><button onClick={() => setDeleteModal({ ...deleteModal, show: false })} className="px-5 py-2.5 text-slate-500 hover:bg-slate-50 font-bold rounded-xl transition-colors text-sm">取消</button><button onClick={() => { if (deleteModal.onConfirm) deleteModal.onConfirm(); setDeleteModal({ ...deleteModal, show: false }); }} className="px-5 py-2.5 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 shadow-lg transition-transform active:scale-95 text-sm">確認刪除</button></div>
+          </div>
         </div>
       )}
       <style>{`.input-field { width: 100%; padding: 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.75rem; outline: none; transition: all 0.2s; } .input-field:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); } .pb-safe { padding-bottom: env(safe-area-inset-bottom); } @keyframes fade-in { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } } .animate-fade-in { animation: fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1); }`}</style>
