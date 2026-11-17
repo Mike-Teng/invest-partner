@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { calculateUnitAccounting, calculatePerformance, summarizeCashFlows, createFundTransaction } from './lib/accounting.js';
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove, query, orderBy, getDocs, writeBatch } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
@@ -142,13 +143,6 @@ export default function App() {
     if (isLoading) return <Skeleton className="h-6 w-24 inline-block" />;
     if (!isAllowed) return "****";
     return formatMoney(amount);
-  };
-
-  // 安全顯示單價
-  const securePrice = (amount) => {
-    if (isLoading) return <Skeleton className="h-6 w-16 inline-block" />;
-    if (!isAllowed) return "****";
-    return formatPrice(amount);
   };
 
   useEffect(() => {
@@ -303,84 +297,13 @@ export default function App() {
     return { cashBalance, marketValue, holdingsList };
   }, [trades, capitalStats.totalCapital, marketPrices, exchangeRate]);
 
-  // --- 2. 基金單位會計系統 ---
-  const unitStats = useMemo(() => {
-    let totalInvestedCash = 0;
-    let totalUnitsIssued = 0;
-    const investorData = {};
-    investors.forEach(inv => investorData[inv] = { invested: 0, units: 0 });
-
-    const sortedFunds = [...funds].sort((a, b) => new Date(a.date) - new Date(b.date));
-    const enrichedFunds = [];
-
-    sortedFunds.forEach(f => {
-      const amt = safeNumber(f.amount);
-      const inv = f.investor;
-      let units = safeNumber(f.units);
-      let calculatedBuyPrice = safeNumber(f.buyPrice);
-
-      if (units <= 0 && calculatedBuyPrice <= 0) {
-        const prevHistory = historyData
-          .filter(h => h.date < f.date)
-          .pop();
-
-        if (prevHistory) {
-          let unitsAtSnapshot = 0;
-          enrichedFunds.forEach(ef => {
-            if (ef.date <= prevHistory.date) {
-              unitsAtSnapshot += ef.units;
-            }
-          });
-
-          if (unitsAtSnapshot > 0) {
-            const navAtTime = prevHistory.total / unitsAtSnapshot;
-            calculatedBuyPrice = navAtTime;
-            units = amt / navAtTime;
-          } else {
-            calculatedBuyPrice = 10;
-            units = amt / 10;
-          }
-        } else {
-          calculatedBuyPrice = 10;
-          units = amt / 10;
-        }
-      } else {
-        if (calculatedBuyPrice > 0 && units <= 0) {
-          units = amt / calculatedBuyPrice;
-        } else if (units > 0 && calculatedBuyPrice <= 0) {
-          calculatedBuyPrice = amt / units;
-        }
-      }
-
-      if (investorData[inv]) {
-        investorData[inv].invested += amt;
-        investorData[inv].units += units;
-      }
-      totalInvestedCash += amt;
-      totalUnitsIssued += units;
-
-      enrichedFunds.push({
-        ...f,
-        units,
-        buyPrice: calculatedBuyPrice
-      });
-    });
-
-    const cashBalance = totalInvestedCash + portfolioStats.tradeCashFlow;
-    const totalAssets = portfolioStats.cashBalance + portfolioStats.marketValue;
-    const currentUnitPrice = totalUnitsIssued > 0 ? (totalAssets / totalUnitsIssued) : 10;
-
-    return {
-      totalInvestedCash,
-      totalUnitsIssued,
-      investorData,
-      cashBalance,
-      totalAssets,
-      currentUnitPrice,
-      enrichedFunds
-    };
-  }, [funds, investors, portfolioStats, historyData]);
-
+  // Stored signed units are the source of truth; cash flows remain separate.
+  const unitStats = useMemo(() => calculateUnitAccounting({
+    funds,
+    investors,
+    historyData,
+    totalAssets: portfolioStats.cashBalance + portfolioStats.marketValue,
+  }), [funds, investors, portfolioStats, historyData]);
 
   const allocationData = useMemo(() => {
     const data = [
@@ -444,43 +367,27 @@ export default function App() {
     const isSpecificInvestor = !isAdmin && currentInvestorName;
     const [showProfitChart, setShowProfitChart] = useState(false);
 
-    let displayAssets = unitStats.totalAssets;
-    let displayCapital = unitStats.totalInvestedCash;
-    let titlePrefix = "總";
+    const myData = isSpecificInvestor ? unitStats.investorData[currentInvestorName] : null;
+    const display = calculatePerformance({
+      assets: myData ? myData.units * unitStats.currentUnitPrice : unitStats.totalAssets,
+      deposits: myData ? myData.deposits : unitStats.deposits,
+      withdrawals: myData ? myData.withdrawals : unitStats.withdrawals,
+    });
+    const displayAssets = display.assets;
+    const displayPL = display.profit;
+    const displayROI = display.returnOnDeposits;
+    const titlePrefix = isSpecificInvestor ? '我的' : '總';
 
-    if (isSpecificInvestor) {
-      const myData = unitStats.investorData[currentInvestorName];
-      displayAssets = (myData?.units || 0) * unitStats.currentUnitPrice;
-      displayCapital = myData?.invested || 0;
-      titlePrefix = "我的";
-    }
-
-    const displayPL = displayAssets - displayCapital;
-    const displayROI = displayCapital > 0 ? (displayPL / displayCapital) : 0;
-
-    // 計算歷史獲利資料
-    const chartData = useMemo(() => {
-      return historyData.map(h => {
-        let capTotal = 0;
-        let capMe = 0;
-        // 計算該歷史日期之前的總投入本金
-        funds.forEach(f => {
-          if (f.date <= h.date) {
-            const amt = safeNumber(f.amount);
-            capTotal += amt;
-            if (isSpecificInvestor && f.investor === currentInvestorName) {
-              capMe += amt;
-            }
-          }
-        });
-
-        return {
-          ...h,
-          totalProfit: h.total - capTotal,
-          meProfit: (h[currentInvestorName] || 0) - capMe
-        };
+    // Historical snapshots are unchanged; subtract net cash flows, not deposits alone.
+    const chartData = historyData.map(h => {
+      const fundsAtDate = funds.filter(f => f.date <= h.date);
+      const total = calculatePerformance({ assets: h.total, ...summarizeCashFlows(fundsAtDate) });
+      const personal = calculatePerformance({
+        assets: h[currentInvestorName] || 0,
+        ...summarizeCashFlows(fundsAtDate.filter(f => f.investor === currentInvestorName)),
       });
-    }, [historyData, funds, isSpecificInvestor, currentInvestorName]);
+      return { ...h, totalProfit: total.profit, meProfit: personal.profit };
+    });
 
     return (
       <div className="space-y-6">
@@ -517,7 +424,7 @@ export default function App() {
                 <div className={`p-2 rounded-lg mr-3 transition-colors ${showProfitChart ? 'bg-green-100 text-green-600' : 'bg-brand-50 text-brand-600'}`}>
                   <LineChartIcon className="w-5 h-5" />
                 </div>
-                {showProfitChart ? '純獲利趨勢' : '資產成長趨勢'}
+                {showProfitChart ? '累計收益趨勢' : '資產成長趨勢'}
               </h3>
 
               {/* 切換開關 */}
@@ -532,7 +439,7 @@ export default function App() {
                   onClick={() => setShowProfitChart(true)}
                   className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all toggle-option ${showProfitChart ? 'toggle-option-active text-brand-600' : 'toggle-option-inactive'}`}
                 >
-                  純獲利
+                  累計收益
                 </button>
               </div>
             </div>
@@ -568,7 +475,7 @@ export default function App() {
                   />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontFamily: 'Inter, sans-serif', fontSize: '13px' }}
-                    formatter={(value) => [formatMoney(value), showProfitChart ? "純獲利" : "資產"]}
+                    formatter={(value) => [formatMoney(value), showProfitChart ? "累計收益" : "資產"]}
                     labelFormatter={(label) => `日期: ${label}`}
                   />
                   <Area
@@ -615,7 +522,7 @@ export default function App() {
         )}
 
         {/* 3. 儀表板卡片 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <Card className="p-6 relative overflow-hidden group gradient-top-bar-blue">
             <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <Landmark className="w-24 h-24 text-brand-500 transform translate-x-4 -translate-y-4" />
@@ -627,34 +534,56 @@ export default function App() {
             </div>
           </Card>
 
+          {[
+            { label: '累計入金', value: display.deposits, description: '歷次投入金額合計，不扣除提領' },
+            { label: '累計提領', value: display.withdrawals, description: '歷次領回金額合計，包含本金與收益' },
+          ].map(item => (
+            <Card key={item.label} className="p-6 relative overflow-hidden gradient-top-bar-indigo">
+              <div className="text-slate-500 text-sm font-medium mb-1">{item.label}</div>
+              <div className="text-2xl font-bold text-slate-800 font-mono">{secureMoney(item.value)}</div>
+              <div className="text-xs text-slate-400 mt-2">{item.description}</div>
+            </Card>
+          ))}
+
           <Card className="p-6 relative overflow-hidden group gradient-top-bar-indigo">
             <div className="absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <PiggyBank className="w-24 h-24 text-indigo-600 transform translate-x-4 -translate-y-4" />
             </div>
-            <div className="text-slate-500 text-sm font-medium mb-1 relative z-10 tracking-tight">{titlePrefix}投入本金</div>
-            <div className="text-2xl font-bold text-slate-800 font-mono relative z-10">{secureMoney(displayCapital)}</div>
+            <div className="text-slate-500 text-sm font-medium mb-1 relative z-10 tracking-tight">{titlePrefix}淨投入</div>
+            <div className="text-2xl font-bold text-slate-800 font-mono relative z-10">{secureMoney(display.netContributions)}</div>
+            <div className="text-xs text-slate-400 mt-2 relative z-10">累計入金 − 累計提領；可為負數</div>
           </Card>
 
           <Card className="p-6 relative overflow-hidden group gradient-top-bar-green">
             <div className={`absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity ${displayPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               <Coins className="w-24 h-24 transform translate-x-4 -translate-y-4" />
             </div>
-            <div className="text-slate-500 text-sm font-medium mb-1 relative z-10 tracking-tight">{titlePrefix}損益</div>
+            <div className="text-slate-500 text-sm font-medium mb-1 relative z-10 tracking-tight">{titlePrefix}累計收益</div>
             <div className={`text-2xl font-bold font-mono relative z-10 ${!isAllowed ? 'text-slate-800' : (displayPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>
               {isAllowed && (displayPL >= 0 ? '+' : '')}{secureMoney(displayPL)}
             </div>
+            <div className="text-xs text-slate-400 mt-2 relative z-10">目前資產 + 累計提領 − 累計入金</div>
           </Card>
 
           <Card className="p-6 relative overflow-hidden group gradient-top-bar-purple">
             <div className={`absolute right-0 top-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity ${displayROI >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               <Percent className="w-24 h-24 transform translate-x-4 -translate-y-4" />
             </div>
-            <div className="text-slate-500 text-sm font-medium mb-1 relative z-10">投資報酬率 (ROI)</div>
+            <div className="text-slate-500 text-sm font-medium mb-1 relative z-10">累計投入收益率</div>
             <div className={`text-2xl font-bold font-mono relative z-10 ${!isAllowed ? 'text-slate-800' : (displayROI >= 0 ? 'text-green-600' : 'text-red-600')}`}>
-              {isAllowed ? formatPercent(displayROI) : "****"}
+              {isAllowed ? (displayROI === null ? "不適用" : formatPercent(displayROI)) : "****"}
             </div>
+            <div className="text-xs text-slate-400 mt-2 relative z-10">累計收益 ÷ 累計入金</div>
           </Card>
         </div>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          累計收益包含已領回的收益。累計投入收益率為非年化比例，未考慮投入時間；再次入金也會計入累計入金，並非基金淨值漲幅。
+        </p>
+        {isAllowed && unitStats.hasUnallocatedAssets && (
+          <div role="alert" className="bg-orange-50 border border-orange-200 text-orange-800 p-4 rounded-xl text-sm">
+            所有單位已結清，帳上仍有 {formatPrice(unitStats.totalAssets)} 未分配資產（可能包含四捨五入差額）。請先核對結清差額，再新增資金紀錄。
+          </div>
+        )}
 
         {/* 4. 合夥人權益分配表 */}
         <Card className="overflow-hidden">
@@ -668,12 +597,12 @@ export default function App() {
                 <thead>
                   <tr className="text-slate-400 text-sm border-b border-slate-100">
                     <th className="pb-3 font-medium whitespace-nowrap pl-2">投資人</th>
-                    <th className="pb-3 font-medium whitespace-nowrap">投入本金</th>
-                    {/* 新增平均成本欄位 */}
-                    <th className="pb-3 font-medium whitespace-nowrap">平均成本</th>
+                    <th className="pb-3 px-3 font-medium whitespace-nowrap">累計入金</th>
+                    <th className="pb-3 px-3 font-medium whitespace-nowrap">累計提領</th>
+                    <th className="pb-3 px-3 font-medium whitespace-nowrap">淨投入</th>
                     <th className="pb-3 font-medium whitespace-nowrap">持有單位</th>
-                    <th className="pb-3 font-medium whitespace-nowrap">當前淨值</th>
-                    <th className="pb-3 font-medium whitespace-nowrap pr-2">個人損益</th>
+                    <th className="pb-3 px-3 font-medium whitespace-nowrap">目前資產</th>
+                    <th className="pb-3 font-medium whitespace-nowrap pr-2">累計收益</th>
                   </tr>
                 </thead>
                 <tbody className="text-slate-600">
@@ -681,9 +610,7 @@ export default function App() {
                     const data = unitStats.investorData[inv];
                     const units = data.units;
                     const val = units * unitStats.currentUnitPrice;
-                    const pl = val - data.invested;
-                    // 計算平均成本 (投入本金 / 單位數)
-                    const avgCost = units > 0 ? (data.invested / units) : 0;
+                    const pl = calculatePerformance({ assets: val, ...data }).profit;
                     const isMe = inv === currentInvestorName;
 
                     return (
@@ -694,15 +621,13 @@ export default function App() {
                           </div>
                           {inv}
                         </td>
-                        <td className="py-4 whitespace-nowrap">{secureMoney(data.invested)}</td>
-                        <td className="py-4 font-mono text-slate-500 whitespace-nowrap">
-                          {/* 修改: 使用 formatPrice 顯示小數點後兩位 */}
-                          {isAllowed ? formatPrice(avgCost) : "**"}
-                        </td>
+                        <td className="py-4 px-3 whitespace-nowrap">{secureMoney(data.deposits)}</td>
+                        <td className="py-4 px-3 whitespace-nowrap">{secureMoney(data.withdrawals)}</td>
+                        <td className="py-4 px-3 whitespace-nowrap">{secureMoney(data.netContributions)}</td>
                         <td className="py-4 font-mono text-slate-500 whitespace-nowrap">
                           {isAllowed ? new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(units) : "**"}
                         </td>
-                        <td className="py-4 font-bold text-brand-600 whitespace-nowrap">{secureMoney(val)}</td>
+                        <td className="py-4 px-3 font-bold text-brand-600 whitespace-nowrap">{secureMoney(val)}</td>
                         <td className={`py-4 whitespace-nowrap pr-2 font-medium ${!isAllowed ? 'text-slate-600' : (pl >= 0 ? 'text-green-600' : 'text-red-600')}`}>
                           {isAllowed && (pl >= 0 ? '+' : '')}{secureMoney(pl)}
                         </td>
@@ -770,12 +695,21 @@ export default function App() {
 
     // 計算當下預估能買到/賣出的單位數 (顯示用)
     const estPrice = unitStats.currentUnitPrice;
-    // 提領時顯示負數單位
-    const estUnits = amount ? ((fundType === 'WITHDRAW' ? -parseFloat(amount) : parseFloat(amount)) / estPrice) : 0;
-
     // 取得當前選定投資人的最大可提領狀態
-    const currentInvestorData = unitStats.investorData[investor] || { units: 0, invested: 0 };
+    const currentInvestorData = unitStats.investorData[investor] || { units: 0 };
     const maxWithdrawValue = currentInvestorData.units * unitStats.currentUnitPrice;
+    // Preview the same signed units that will be saved, including full redemption.
+    let estUnits = 0;
+    if (amount) {
+      try {
+        estUnits = createFundTransaction({
+          amount: Number(amount), isWithdrawal: fundType === 'WITHDRAW',
+          unitPrice: estPrice, ownedUnits: currentInvestorData.units,
+        }).units;
+      } catch {
+        // Invalid inputs are explained on submission rather than showing NaN.
+      }
+    }
 
     // 一鍵全數提領
     const handleMaxWithdraw = () => {
@@ -784,39 +718,35 @@ export default function App() {
 
     const handleAddFund = async (e) => {
       e.preventDefault();
-      const numAmount = parseFloat(amount);
-      if (!numAmount || numAmount <= 0) return;
-
-      const buyPrice = unitStats.currentUnitPrice;
-      const isWithdraw = fundType === 'WITHDRAW';
-      const finalAmount = isWithdraw ? -numAmount : numAmount;
-
-      // 如果是提領，檢查是否超過餘額
-      if (isWithdraw && numAmount > maxWithdrawValue + 1) { // +1 容許微小的小數點誤差
-        alert("提領金額不能大於該投資人的當前資產總值！");
+      if (!isAdmin) return;
+      if (unitStats.hasUnallocatedAssets) {
+        alert('所有單位已結清，但帳上仍有未分配資產。請先核對結清差額，再新增資金紀錄。');
         return;
       }
-
-      // 如果提領金額非常接近最大值 (例如誤差在1元以內)，視為「全數提領」，直接扣除他所有的單位數，避免小數點殘留
-      let unitsToTransact;
-      if (isWithdraw && Math.abs(numAmount - maxWithdrawValue) < 1) {
-        unitsToTransact = -currentInvestorData.units; // 完美歸零
-      } else {
-        unitsToTransact = finalAmount / buyPrice;
+      let transaction;
+      const isWithdraw = fundType === 'WITHDRAW';
+      try {
+        transaction = createFundTransaction({
+          amount: Number(amount),
+          isWithdrawal: isWithdraw,
+          unitPrice: unitStats.currentUnitPrice,
+          ownedUnits: currentInvestorData.units,
+        });
+      } catch (error) {
+        alert(error.message);
+        return;
       }
 
       try {
         await addDoc(collection(db, "funds"), {
           date,
           investor,
-          amount: finalAmount,
-          buyPrice,
-          units: unitsToTransact,
+          ...transaction,
           createdAt: Date.now()
         });
         setAmount('');
         const actionName = isWithdraw ? '提領' : '入金';
-        alert(`${actionName}成功！\n日期: ${date}\n成交淨值: ${formatMoney(buyPrice)}\n${actionName}單位: ${new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(Math.abs(unitsToTransact))}`);
+        alert(`${actionName}成功！\n日期: ${date}\n成交淨值: ${formatPrice(transaction.buyPrice)}\n${actionName}單位: ${new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(Math.abs(transaction.units))}`);
       } catch (error) {
         console.error("Error adding document: ", error);
         alert("寫入失敗");
@@ -1336,13 +1266,13 @@ export default function App() {
         <header className="mb-8">
           <h1 className="text-3xl font-bold text-slate-900 mb-2 tracking-tight">
             {activeTab === 'dashboard' && '投資組合總覽'}
-            {activeTab === 'funds' && '資金存入管理'}
+            {activeTab === 'funds' && '資金異動管理'}
             {activeTab === 'trade' && '股票交易紀錄'}
             {activeTab === 'portfolio' && '持倉損益監控'}
           </h1>
           <p className="text-slate-500">
             {activeTab === 'dashboard' && '查看整體績效與合夥人權益分配'}
-            {activeTab === 'funds' && '記錄每位合夥人的本金投入'}
+            {activeTab === 'funds' && '記錄合夥人的入金、提領與單位變動'}
             {activeTab === 'trade' && '新增買入與賣出交易'}
             {activeTab === 'portfolio' && '更新市價以計算未實現損益'}
           </p>
