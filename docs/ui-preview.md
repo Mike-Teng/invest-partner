@@ -27,9 +27,11 @@ and quiet near-white records have distinct depth, with fewer nested borders.
 The card grain is a local SVG texture.
 
 The page background uses the official [Paper Texture](https://shaders.paper.design/paper-texture)
-shader, with fine, low-contrast grain and fibers on off-white paper. Dark speckles
-are disabled so the glass highlights and shadows remain the focus. Its isolated
-decorative component loads separately, uses no remote images, and runs at speed
+shader, with fine, low-contrast grain and fibers on off-white paper. Grain and
+fiber strength are reduced a further 20%, including the fallback texture. Dark
+speckles are disabled. Navigation and switches use clearer surfaces with bright
+edges and a translucent selected state to preserve their glass depth. The isolated
+paper component loads separately, uses no remote images, and runs at speed
 zero with a maximum of about 2 million pixels. A local CSS texture remains if the
 shader cannot load or WebGL is unavailable. Cards, charts, and inputs retain their
 existing surfaces. The dependency is pinned to avoid unreviewed visual changes.
@@ -66,6 +68,8 @@ connection. Do not merge the preview branch until the interface is accepted.
 - Paper background: desktop and 320/390 px mobile layouts across all four pages,
   chart controls, a demo deposit, one canvas retained across page switches, and
   simulated initialization failure leaving navigation and inputs usable.
+- Clear glass controls: chart metric/range selection, deposit/withdrawal and
+  buy/sell switches, keyboard activation, and mobile navigation selection.
 
 The demo is for interface trials. It does not simulate Firebase authentication,
 security rules, concurrent clients, or the daily Apps Script scheduler.
