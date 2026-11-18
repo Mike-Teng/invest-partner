@@ -1,6 +1,6 @@
 import { LayoutDashboard, Wallet, TrendingUp, ChartPie, LogIn, LogOut, ArrowUpRight, RotateCcw } from 'lucide-react';
 const tabs = [
-  { id: 'dashboard', label: '總覽儀表板', short: '總覽', icon: <LayoutDashboard size={19} />, title: '投資組合總覽', description: '掌握資產變化，讓每一份投入都清楚。' },
+  { id: 'dashboard', label: '總覽儀表板', short: '總覽', icon: <LayoutDashboard size={19} />, title: '投資組合總覽' },
   { id: 'funds', label: '資金管理', short: '資金', icon: <Wallet size={19} />, title: '資金異動管理', description: '記錄合夥人的入金、提領與單位變動' },
   { id: 'trade', label: '交易紀錄', short: '交易', icon: <TrendingUp size={19} />, title: '股票交易紀錄', description: '新增買入與賣出交易' },
   { id: 'portfolio', label: '持倉與市價', short: '持倉', icon: <ChartPie size={19} />, title: '持倉損益監控', description: '更新市價以計算未實現損益' },
@@ -11,11 +11,9 @@ export default function AppShell({ activeTab, setActiveTab, user, handleLogin, h
   return <div className="app-shell">
     <a href="#main-content" className="skip-link">跳至主要內容</a>
     <aside className="app-sidebar">
-      <a href="#main-content" onClick={() => setActiveTab('dashboard')} className="app-brand"><span className="brand-symbol"><ArrowUpRight size={25} strokeWidth={2.3} /></span><span>InvestPartner<span className="brand-caption">YOUR SHARED PORTFOLIO</span></span></a>
-      <div className="nav-caption">工作空間</div>
+      <a href="#main-content" onClick={() => setActiveTab('dashboard')} className="app-brand"><span className="brand-symbol"><ArrowUpRight size={25} strokeWidth={2.3} /></span><span>InvestPartner</span></a>
       <nav aria-label="主要導覽" className="app-nav">{tabs.map(({ id, label, icon }) => <button key={id} type="button" aria-current={activeTab === id ? 'page' : undefined} onClick={() => setActiveTab(id)} className={`nav-item ${activeTab === id ? 'nav-active' : ''}`}>{icon}<span>{label}</span><span className="nav-dot" /></button>)}</nav>
       <div className="sidebar-bottom">
-        <div className="sidebar-note"><span className="text-slate-400 text-xs">INVEST TOGETHER</span><p className="text-sm text-slate-600 mt-2 leading-relaxed">一起累積，<br />看見每一步成長。</p></div>
         {user ? <><div className="account-info"><span className="account-avatar">{user.displayName?.[0] || 'U'}</span><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{user.displayName || 'User'}</p><p className="truncate text-[11px] text-slate-400 mt-1">{user.email}</p></div><button aria-label="登出帳號" onClick={handleLogout} className="icon-button"><LogOut size={17} /></button></div></> : <button onClick={handleLogin} className="btn-primary w-full flex justify-center gap-2 text-sm"><LogIn size={17} />Google 登入</button>}
       </div>
     </aside>
@@ -23,9 +21,8 @@ export default function AppShell({ activeTab, setActiveTab, user, handleLogin, h
     <div className="app-workspace">
       <main id="main-content" className="app-main" tabIndex={-1}>
         {import.meta.env.VITE_DEMO_MODE && <div className="demo-banner"><div><span className="demo-pill">介面試用版</span><span>使用示範資料，重新整理即可還原。</span></div><button type="button" onClick={() => window.location.reload()}><RotateCcw size={13} />重設</button></div>}
-        <header className="page-heading"><div><div className="page-eyebrow">WORKSPACE / {String(tabs.findIndex(tab => tab.id === activeTab) + 1).padStart(2, '0')}</div><h1>{current.title}</h1><p>{current.description}</p></div><span className="page-tag">{import.meta.env.VITE_DEMO_MODE ? 'DEMO WORKSPACE' : 'MY WORKSPACE'}</span></header>
+        <header className="page-heading"><div><h1>{current.title}</h1>{current.description && <p>{current.description}</p>}</div></header>
         <div key={activeTab} className="page-enter">{children}</div>
-        <footer className="app-footer"><span>InvestPartner</span><span>每一筆記錄，都是累積。</span></footer>
       </main>
     </div>
     <nav aria-label="手機導覽" className="mobile-nav">{tabs.map(({ id, short, icon }) => <button key={id} type="button" aria-current={activeTab === id ? 'page' : undefined} onClick={() => setActiveTab(id)} className={activeTab === id ? 'mobile-nav-active' : ''}>{icon}<span>{short}</span></button>)}</nav>
