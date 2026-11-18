@@ -10,7 +10,7 @@
   }
 
   body {
-    background: #f0f1ef;
+    background: #f2f1ed;
     min-height: 100vh;
   }
 
@@ -195,7 +195,7 @@
 :root {
   color-scheme: light;
   color: #25282c;
-  --page: #f0f1ef;
+  --page: #f2f1ed;
   --ink: #25282c;
   --muted: #676d72;
   --line: rgb(54 67 58 / 11%);
@@ -220,10 +220,9 @@ details[open] > summary svg:last-child { transform: rotate(180deg); }
 .skip-link { position: fixed; top: -100px; left: 20px; z-index: 100; padding: 12px 20px; background: white; border: 1px solid #4a6d62; border-radius: 8px; }
 .skip-link:focus { top: 12px; }
 .app-shell { position: relative; isolation: isolate; min-height: 100vh; }
-.app-shell::before { content: ''; position: absolute; z-index: -1; inset: 0; pointer-events: none; background: radial-gradient(ellipse 1000px 600px at 90% 0, rgb(255 255 255 / 86%), transparent), linear-gradient(160deg, rgb(222 228 222 / 58%), transparent 65%); }
-.app-shell::after { content: ''; position: absolute; z-index: -1; inset: 0; pointer-events: none; background-image: var(--grain); opacity: .045; }
+.paper-background { position: fixed; z-index: -1; inset: 0; pointer-events: none; background: linear-gradient(rgb(242 241 237 / 86%), rgb(242 241 237 / 86%)), var(--grain); }
 .app-header { position: sticky; top: 0; z-index: 40; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 28px; max-width: 1280px; margin: 0 auto; padding: 24px 40px; isolation: isolate; }
-.app-header::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(rgb(240 241 239 / 44%), rgb(240 241 239 / 12%)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); mask-image: linear-gradient(#000 70%, transparent); -webkit-mask-image: linear-gradient(#000 70%, transparent); pointer-events: none; }
+.app-header::before { content: ''; position: absolute; inset: 0; z-index: -1; background: linear-gradient(rgb(242 241 237 / 44%), rgb(242 241 237 / 12%)); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); mask-image: linear-gradient(#000 70%, transparent); -webkit-mask-image: linear-gradient(#000 70%, transparent); pointer-events: none; }
 .app-brand { display: flex; gap: 9px; align-items: center; width: fit-content; font-size: 18px; font-weight: 650; letter-spacing: -.65px; }
 .brand-symbol { display: inline-flex; justify-content: center; align-items: center; width: 27px; height: 32px; color: var(--ink); }
 .app-nav, .mobile-nav, .confirm-dialog, .app-notification {
@@ -480,7 +479,7 @@ details[open] > summary svg:last-child { transform: rotate(180deg); }
 }
 @media (prefers-reduced-transparency: reduce) {
   .app-nav, .mobile-nav, .toggle-switch, .chart-panel .toggle-switch, .profit-summary.card-base, .material-glass.card-base, .confirm-dialog, .app-notification { background: #fafbf9; backdrop-filter: none; -webkit-backdrop-filter: none; }
-  .app-shell::before, .app-shell::after, .profit-summary::before, .material-glass::before { display: none; }
+  .profit-summary::before, .material-glass::before { display: none; }
   .app-header::before { background: var(--page); backdrop-filter: none; -webkit-backdrop-filter: none; mask-image: none; -webkit-mask-image: none; }
 }
 @media (prefers-reduced-motion: reduce) {

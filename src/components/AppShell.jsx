@@ -1,4 +1,5 @@
 import { LayoutDashboard, Wallet, TrendingUp, ChartPie, LogIn, LogOut, ArrowUpRight, RotateCcw } from 'lucide-react';
+import PaperBackground from './PaperBackground.jsx';
 const tabs = [
   { id: 'dashboard', label: '總覽儀表板', short: '總覽', icon: <LayoutDashboard size={19} />, title: '投資組合總覽' },
   { id: 'funds', label: '資金管理', short: '資金', icon: <Wallet size={19} />, title: '資金異動管理', description: '記錄合夥人的入金、提領與單位變動' },
@@ -9,6 +10,7 @@ const tabs = [
 export default function AppShell({ activeTab, setActiveTab, user, handleLogin, handleLogout, children }) {
   const current = tabs.find(tab => tab.id === activeTab) || tabs[0];
   return <div className="app-shell">
+    <PaperBackground />
     <a href="#main-content" className="skip-link">跳至主要內容</a>
     <header className="app-header">
       <a href="#main-content" onClick={() => setActiveTab('dashboard')} className="app-brand"><span className="brand-symbol"><ArrowUpRight size={25} strokeWidth={2.3} /></span><span>InvestPartner</span></a>

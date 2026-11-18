@@ -24,7 +24,15 @@ Material refinement uses a local, static monochrome grain texture in place of
 repeating stripes. Subtle edge highlights replace diagonal glare; glass controls
 float over a softly tinted background. Matte summaries, translucent entry panels,
 and quiet near-white records have distinct depth, with fewer nested borders.
-The texture adds no dependencies, animation, or external requests.
+The card grain is a local SVG texture.
+
+The page background uses the official [Paper Texture](https://shaders.paper.design/paper-texture)
+shader, with visible roughness and fibers on off-white paper. Its isolated
+decorative component loads separately, uses no remote images, and runs at speed
+zero with a maximum of about 2 million pixels. A local CSS texture remains if the
+shader cannot load or WebGL is unavailable. Cards, charts, and inputs retain their
+existing surfaces. The dependency is pinned to avoid unreviewed visual changes.
+Its license and notice are included in `public/licenses/paper-shaders/`.
 
 ## Demo data
 
@@ -53,7 +61,10 @@ connection. Do not merge the preview branch until the interface is accepted.
   withdrawal, and unchanged page behavior after ignoring style attributes.
 - Material refinement: 1280 px desktop and 320/390 px mobile layouts, chart
   metric/range controls, cancellation preserving input, demo deposit/trade/price
-  saves and reset. Changes are limited to CSS, a local SVG texture, and this guide.
+  saves and reset.
+- Paper background: desktop and 320/390 px mobile layouts across all four pages,
+  chart controls, a demo deposit, one canvas retained across page switches, and
+  simulated initialization failure leaving navigation and inputs usable.
 
 The demo is for interface trials. It does not simulate Firebase authentication,
 security rules, concurrent clients, or the daily Apps Script scheduler.
