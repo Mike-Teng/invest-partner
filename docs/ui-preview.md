@@ -10,10 +10,11 @@ can be expanded. Page, chart-switch, button, and dialog transitions respect
 reduced-motion preferences. Live data updates do not replay the history animation.
 
 The light frosted-glass theme uses a floating top navigation on desktop and a
-bottom navigation on mobile. Open summary figures, neutral surfaces, fine
-dividers, and muted chart colors keep the data readable. Glass effects are
-limited to navigation, switches, dialogs, and notifications, with solid
-backgrounds when transparency is reduced or backdrop blur is unsupported.
+bottom navigation on mobile. A lightly textured matte asset panel, a translucent
+profit panel, and a solid light chart panel distinguish the key figures. Clear
+glass navigation and switches reveal the background; a blurred header keeps
+scrolling content from competing with account and navigation text. Solid
+backgrounds are used when transparency is reduced or backdrop blur is unsupported.
 Financial calculations, record contents, and save handlers are unchanged.
 
 ## Demo data

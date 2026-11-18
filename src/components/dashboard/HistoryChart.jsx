@@ -29,7 +29,7 @@ export default function HistoryChart({ data, isSpecificInvestor, investor }) {
           <YAxis tickFormatter={value => `${value / 1000}k`} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#676d72' }} domain={['auto', 'auto']} width={60} />
           <Tooltip contentStyle={{ borderRadius: 14, border: '1px solid #dce0df', background: '#fafbf9', boxShadow: '0 8px 24px #25282c0d', fontSize: 13 }} formatter={value => [formatMoney(value), profit ? '累計收益' : '資產總值']} labelFormatter={date => date} />
           {/* Animate the chart container only on deliberate switches, never on a live data update. */}
-          <Area dataKey={key} type="monotone" isAnimationActive={false} stroke={color} strokeWidth={2} fill="url(#trendFill)" activeDot={{ r: 5, stroke: '#fff', strokeWidth: 3 }} />
+          <Area dataKey={key} type="monotone" isAnimationActive={false} stroke={color} strokeWidth={2.5} fill="url(#trendFill)" activeDot={{ r: 5, stroke: '#fff', strokeWidth: 3 }} />
         </AreaChart>
       </ResponsiveContainer>
     </div> : <div className="trend-plot flex flex-col items-center justify-center text-slate-400 gap-3"><ChartNoAxesCombined size={32} /><p className="text-sm">尚無歷史快照</p></div>}

@@ -9,7 +9,7 @@ export default function PerformanceSummary({ display, unitStats, isSpecificInves
     <div className="summary-grid">
       <section className="asset-hero">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm text-slate-500">{isSpecificInvestor ? '我的資產' : '總資產'}</span>
+          <span className="summary-label">{isSpecificInvestor ? '我的資產' : '總資產'}</span>
           <span className="currency-badge">TWD</span>
         </div>
         <div className="asset-value tabular-nums">{secureMoney(display.assets)}</div>
@@ -19,7 +19,7 @@ export default function PerformanceSummary({ display, unitStats, isSpecificInves
         </div>
       </section>
       <Card className="profit-summary">
-        <div className="flex justify-between items-center"><span className="text-sm text-slate-500">{isSpecificInvestor ? '我的' : ''}累計收益</span><Coins size={19} className="text-slate-400" /></div>
+        <div className="flex justify-between items-center"><span className="summary-label">{isSpecificInvestor ? '我的' : ''}累計收益</span><Coins size={19} className="text-slate-400" /></div>
         <div className={`profit-value tabular-nums ${isAllowed ? positive ? 'text-emerald-700' : 'text-red-600' : 'text-slate-800'}`}>
           {isAllowed && positive ? '+' : ''}{secureMoney(display.profit)}
         </div>
