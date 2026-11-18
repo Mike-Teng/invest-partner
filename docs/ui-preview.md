@@ -1,6 +1,6 @@
-# UI preview
+# Interface and preview workflow
 
-This branch refreshes the overview layout and extracts the overview, funds,
+The interface refresh updates the overview layout and extracts the overview, funds,
 trades, and portfolio into stable React components. Calculations and transaction
 validation still use the existing modules in `src/lib`.
 
@@ -45,8 +45,12 @@ the sample. No login is needed, and the demo cannot read or write Firebase.
 
 `npm run build:demo` and Vercel deployments with `VERCEL_ENV=preview` replace
 the Firebase SDK at build time. A build check rejects any real Firebase SDK
-module in a demo bundle. Ordinary production builds keep the existing Firebase
-connection. Do not merge the preview branch until the interface is accepted.
+module in a demo bundle. Production deployments from `main` keep the existing
+Firebase connection, Google sign-in, access rules, and Yi/Ma partner mapping.
+The approved interface is shared by production and preview; only previews use
+fictional data. Future UI trials should stay on a preview branch until accepted.
+Promoting this interface does not migrate, seed, or rewrite Firestore records,
+and does not deploy the separate Apps Script price/snapshot jobs.
 
 ## Validation
 
@@ -70,6 +74,10 @@ connection. Do not merge the preview branch until the interface is accepted.
   simulated initialization failure leaving navigation and inputs usable.
 - Clear glass controls: chart metric/range selection, deposit/withdrawal and
   buy/sell switches, keyboard activation, and mobile navigation selection.
+- Production release: confirm real Firebase Auth/Firestore modules and the
+  existing project are present, with no demo SDK, fixtures, account, or banner;
+  preview builds retain their isolation. Accounting modules, ledger access, and
+  snapshot jobs match the previous production revision.
 
 The demo is for interface trials. It does not simulate Firebase authentication,
 security rules, concurrent clients, or the daily Apps Script scheduler.
