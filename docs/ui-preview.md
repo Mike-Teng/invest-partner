@@ -20,6 +20,12 @@ record surfaces. The portfolio uses the same materials for allocation, holdings,
 and price inputs, including mobile record cards. Financial calculations, record
 contents, and save handlers are unchanged.
 
+Material refinement uses a local, static monochrome grain texture in place of
+repeating stripes. Subtle edge highlights replace diagonal glare; glass controls
+float over a softly tinted background. Matte summaries, translucent entry panels,
+and quiet near-white records have distinct depth, with fewer nested borders.
+The texture adds no dependencies, animation, or external requests.
+
 ## Demo data
 
 Run `npm run dev:demo` to try the interface with fictional Alex/Sam records.
@@ -45,6 +51,9 @@ connection. Do not merge the preview branch until the interface is accepted.
 - Entry-page materials: matching desktop form/history alignment, narrow-screen
   record cards and price inputs, full-withdrawal amount filling, partial
   withdrawal, and unchanged page behavior after ignoring style attributes.
+- Material refinement: 1280 px desktop and 320/390 px mobile layouts, chart
+  metric/range controls, cancellation preserving input, demo deposit/trade/price
+  saves and reset. Changes are limited to CSS, a local SVG texture, and this guide.
 
 The demo is for interface trials. It does not simulate Firebase authentication,
 security rules, concurrent clients, or the daily Apps Script scheduler.
