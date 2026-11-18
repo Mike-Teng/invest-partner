@@ -15,7 +15,10 @@ profit panel, and a solid light chart panel distinguish the key figures. Clear
 glass navigation and switches reveal the background; a blurred header keeps
 scrolling content from competing with account and navigation text. Solid
 backgrounds are used when transparency is reduced or backdrop blur is unsupported.
-Financial calculations, record contents, and save handlers are unchanged.
+Funds and trades use glass entry panels, matte NAV/cash summaries, and light
+record surfaces. The portfolio uses the same materials for allocation, holdings,
+and price inputs, including mobile record cards. Financial calculations, record
+contents, and save handlers are unchanged.
 
 ## Demo data
 
@@ -39,6 +42,9 @@ connection. Do not merge the preview branch until the interface is accepted.
 - Frosted-glass checks: 320/390 px mobile and 1024 px tablet layouts, desktop
   navigation, chart metric/range selection, partner details, cancelling a dialog
   without losing input, and demo deposit/trade/price-update/reset flows.
+- Entry-page materials: matching desktop form/history alignment, narrow-screen
+  record cards and price inputs, full-withdrawal amount filling, partial
+  withdrawal, and unchanged page behavior after ignoring style attributes.
 
 The demo is for interface trials. It does not simulate Firebase authentication,
 security rules, concurrent clients, or the daily Apps Script scheduler.

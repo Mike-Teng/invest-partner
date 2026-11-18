@@ -112,25 +112,25 @@ export default function FundManager({ notify, investors, funds, historyData, uni
     };
 
     return (
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="ledger-layout grid grid-cols-1 lg:grid-cols-3 gap-6">
         {isAdmin ? (
           <div className="lg:col-span-1">
-            <Card className="p-6 entry-form-panel">
-              <h3 className="font-bold text-slate-700 mb-6 flex items-center text-lg">
-                <div className={`p-2 rounded-lg mr-3 ${fundType === 'DEPOSIT' ? 'bg-brand-50 text-brand-600' : 'bg-orange-100 text-orange-600'}`}>
+            <Card className="material-glass entry-form-panel">
+              <h3 className="panel-title mb-6 flex items-center">
+                <div className={`panel-symbol mr-3 ${fundType === 'DEPOSIT' ? 'bg-brand-50 text-brand-600' : 'bg-orange-100 text-orange-600'}`}>
                   {fundType === 'DEPOSIT' ? <Plus className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
                 </div>
                 資金異動
               </h3>
 
-              <div className="bg-brand-50 p-4 rounded-xl mb-6 border border-brand-100">
-                <div className="flex justify-between items-center mb-2">
+              <div className="material-matte entry-summary mb-6">
+                <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
                   <span className="text-xs font-bold text-slate-400">參考淨值狀態</span>
                   <span className={`text-xs px-2 py-0.5 rounded ${funds.length === 0 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
                     {funds.length === 0 ? '初始期 (固定 10)' : '營運期 (浮動)'}
                   </span>
                 </div>
-                <div className="flex justify-between items-end">
+                <div className="flex flex-wrap justify-between items-end gap-3">
                   <div>
                     <div className="text-xs text-slate-500 mb-1">預估成交價</div>
                     <div className="text-xl font-bold text-slate-800">{estPrice > 0 ? formatPrice(estPrice) : '待填當時淨值'}</div>
@@ -175,7 +175,7 @@ export default function FundManager({ notify, investors, funds, historyData, uni
                   </select>
                 </div>
                 <div>
-                  <div className="flex justify-between items-center mb-2">
+                  <div className="flex flex-wrap justify-between items-center gap-2 mb-2">
                     <label htmlFor="fundmanager-amount" className="block text-sm font-bold text-slate-500">金額 (TWD)</label>
                     {fundType === 'WITHDRAW' && (
                       <button 
@@ -202,7 +202,7 @@ export default function FundManager({ notify, investors, funds, historyData, uni
                     </div>
                   )}
                 </div>
-                <button type="submit" className={`w-full text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all duration-200 active:scale-[0.97] ${fundType === 'DEPOSIT' ? 'bg-brand-500 hover:bg-brand-600 shadow-brand-500/20 hover:shadow-glow-sm' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/20'}`}>
+                <button type="submit" className={`entry-submit w-full text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 active:scale-[0.97] ${fundType === 'DEPOSIT' ? 'bg-brand-500 hover:bg-brand-600 shadow-brand-500/20 hover:shadow-glow-sm' : 'bg-orange-500 hover:bg-orange-600 shadow-orange-500/20'}`}>
                   {fundType === 'DEPOSIT' ? '確認入金' : '確認提領出金'}
                 </button>
               </form>
@@ -210,7 +210,7 @@ export default function FundManager({ notify, investors, funds, historyData, uni
           </div>
         ) : (
           <div className="lg:col-span-1">
-            <div className="bg-slate-50 p-8 rounded-2xl border-2 border-dashed border-slate-200 text-center text-slate-400">
+            <div className="readonly-panel p-8 text-center text-slate-500">
               <Lock className="w-10 h-10 mx-auto mb-3 text-slate-300" />
               <p>僅管理員可新增資金</p>
             </div>
@@ -218,15 +218,15 @@ export default function FundManager({ notify, investors, funds, historyData, uni
         )}
 
         <div className="lg:col-span-2">
-          <Card className="overflow-hidden">
-            <div className="p-4 border-b border-slate-100/60 bg-slate-50/30">
-              <h3 className="font-bold text-slate-700 flex items-center">
+          <Card className="material-paper ledger-panel overflow-hidden">
+            <div className="ledger-panel-heading">
+              <h3 className="panel-title flex items-center">
                 <Wallet className="w-4 h-4 mr-2 text-slate-400" /> 資金異動紀錄
               </h3>
             </div>
 
-            <div className="hidden md:block overflow-x-auto p-6">
-              <table className="w-full text-left">
+            <div className="ledger-table-scroll hidden md:block overflow-x-auto">
+              <table className="ledger-table w-full text-left">
                 <thead>
                   <tr className="text-slate-400 text-sm border-b border-slate-100">
                     <th className="pb-3 font-medium whitespace-nowrap pl-2">日期</th>
@@ -266,7 +266,7 @@ export default function FundManager({ notify, investors, funds, historyData, uni
                         </td>
                         {isAdmin && (
                           <td className="py-4 text-center whitespace-nowrap">
-                            <button aria-label={`刪除 ${f.investor} ${f.date} 資金紀錄`} onClick={() => handleDelete(f.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
+                            <button aria-label={`刪除 ${f.investor} ${f.date} 資金紀錄`} onClick={() => handleDelete(f.id)} className="record-delete p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors">
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </td>
@@ -281,13 +281,13 @@ export default function FundManager({ notify, investors, funds, historyData, uni
               </table>
             </div>
 
-            <div className="md:hidden p-4 space-y-3">
+            <div className="ledger-mobile-list md:hidden space-y-3">
               {[...unitStats.enrichedFunds].reverse().map(f => {
                 const isWithdraw = f.amount < 0;
                 return (
-                  <div key={f.id} className={`bg-slate-50 p-4 rounded-xl border flex justify-between items-center ${isWithdraw ? 'border-orange-200 bg-orange-50/50' : 'border-slate-100'}`}>
+                  <div key={f.id} className={`ledger-record fund-record border flex justify-between items-center ${isWithdraw ? 'border-orange-200 bg-orange-50/50' : 'border-slate-100'}`}>
                     <div>
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${isWithdraw ? 'bg-orange-100 text-orange-600' : 'bg-brand-50 text-brand-600'}`}>
                           {isWithdraw ? '提領' : '入金'}
                         </span>
@@ -297,13 +297,13 @@ export default function FundManager({ notify, investors, funds, historyData, uni
                       <div className={`font-mono font-bold ${isWithdraw ? 'text-orange-600' : 'text-slate-800'}`}>
                         {secureMoney(f.amount)}
                       </div>
-                      <div className="text-xs text-slate-400 mt-1 flex gap-3 items-center" onClick={() => handleEditNav(f)}>
+                      <div className="fund-record-details text-xs text-slate-500 mt-2 flex flex-wrap gap-x-3 gap-y-1 items-center" onClick={() => handleEditNav(f)}>
                         <span className="flex items-center">淨值: {formatPrice(f.buyPrice)} {isAdmin && <Pencil className="w-3 h-3 ml-1 text-slate-300" />}</span>
                         <span>單位: {formatUnit(f.units)}</span>
                       </div>
                     </div>
                     {isAdmin && (
-                      <button aria-label={`刪除 ${f.investor} ${f.date} 資金紀錄`} onClick={() => handleDelete(f.id)} className="p-2 text-slate-300 hover:text-red-500">
+                      <button aria-label={`刪除 ${f.investor} ${f.date} 資金紀錄`} onClick={() => handleDelete(f.id)} className="record-delete p-2 text-slate-400 hover:text-red-500">
                         <Trash2 className="w-5 h-5" />
                       </button>
                     )}

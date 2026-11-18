@@ -19,26 +19,26 @@ export default function Portfolio({ marketPrices, portfolioStats, allocationData
     };
 
     return (
-      <div className="space-y-6">
+      <div className="portfolio-layout space-y-6">
         {isAllowed && (
-          <Card className="p-6">
-            <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center"><div className="p-2 bg-brand-100 text-brand-600 rounded-lg mr-3"><PieChartIcon className="w-5 h-5" /></div>資產配置 (台幣)</h3>
-            <div className="h-[300px] flex items-center justify-center">
+          <Card className="material-glass portfolio-allocation-panel">
+            <h3 className="panel-title mb-5 flex items-center"><div className="panel-symbol mr-3 text-brand-600"><PieChartIcon className="w-5 h-5" /></div>資產配置 (台幣)</h3>
+            <div className="portfolio-chart-surface h-[300px] flex items-center justify-center">
               {allocationData.length > 0 ? (
                 <ResponsiveContainer><PieChart><Pie data={allocationData} cx="50%" cy="50%" innerRadius={70} outerRadius={110} fill="#8884d8" paddingAngle={5} dataKey="value" isAnimationActive={!reducedMotion} animationDuration={350} animationEasing="ease-out">{allocationData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip formatter={(v, n) => { const total = allocationData.reduce((a, c) => a + c.value, 0); return [`${formatMoney(v)} (${formatPercent(total > 0 ? v / total : 0)})`, n]; }} /><Legend /></PieChart></ResponsiveContainer>
               ) : <p className="text-slate-400">無資產數據</p>}
             </div>
           </Card>
         )}
-        <Card className="p-6">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-            <div><h3 className="text-xl font-bold text-slate-800">持倉損益表 (TWD)</h3><p className="text-slate-500 text-sm">金額已換算台幣</p></div>
-            {isAdmin && <button onClick={savePrices} className={`flex items-center px-4 py-2 rounded-xl font-medium transition-all duration-200 shadow-lg ${savedMsg ? 'bg-green-600 text-white shadow-green-500/20' : 'bg-brand-500 hover:bg-brand-600 text-white shadow-brand-500/20 hover:shadow-glow-sm'}`}>{savedMsg ? '已同步!' : <><Save className="w-4 h-4 mr-2" /> 更新市價</>}</button>}
+        <Card className="material-paper portfolio-table-panel overflow-hidden">
+          <div className="material-matte portfolio-table-heading flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div><h3 className="panel-title">持倉損益表 (TWD)</h3><p className="text-slate-500 text-xs mt-2">金額已換算台幣</p></div>
+            {isAdmin && <button onClick={savePrices} className={`entry-submit flex items-center px-4 py-2 rounded-xl font-medium transition-all duration-200 ${savedMsg ? 'bg-green-600 text-white shadow-green-500/20' : 'bg-brand-500 hover:bg-brand-600 text-white shadow-brand-500/20 hover:shadow-glow-sm'}`}>{savedMsg ? '已同步!' : <><Save className="w-4 h-4 mr-2" /> 更新市價</>}</button>}
           </div>
 
           {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left">
+          <div className="ledger-table-scroll hidden md:block overflow-x-auto">
+            <table className="ledger-table holdings-table w-full text-left">
               <thead>
                 <tr className="text-slate-400 text-sm border-b">
                   <th className="pb-4 pl-4 pr-2">代號</th>
@@ -58,7 +58,7 @@ export default function Portfolio({ marketPrices, portfolioStats, allocationData
                     <td className="py-5 px-4 text-right">{item.qty}</td>
                     <td className="py-5 px-4 text-right text-xs text-slate-500">{item.isUS ? <span className="bg-brand-50 text-brand-600 px-2 py-1 rounded">USD</span> : <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded">TWD</span>}</td>
                     <td className="py-5 px-4 text-right font-mono text-slate-600">{formatOriginalMoney(item.avgCostOriginal, item.isUS)}</td>
-                    <td className="py-5 px-4 text-right"><input aria-label={`${item.ticker} 現價`} type="number" step="0.1" disabled={!isAdmin} value={priceInputs[item.ticker] || ''} onChange={e => handlePriceChange(item.ticker, e.target.value)} placeholder={item.avgCostOriginal.toFixed(1)} className={`input-field w-24 text-right ${isAdmin ? 'bg-brand-50/50 border-brand-200' : 'bg-transparent border-transparent'}`} /></td>
+                    <td className="py-5 px-4 text-right"><input aria-label={`${item.ticker} 現價`} type="number" step="0.1" disabled={!isAdmin} value={priceInputs[item.ticker] || ''} onChange={e => handlePriceChange(item.ticker, e.target.value)} placeholder={item.avgCostOriginal.toFixed(1)} className={`input-field price-input w-24 text-right ${isAdmin ? 'bg-brand-50/50 border-brand-200' : 'bg-transparent border-transparent'}`} /></td>
                     <td className="py-5 px-4 text-right font-medium text-slate-800">{secureMoney(item.currentValue)}</td>
                     <td className={`py-5 px-4 text-right font-medium ${!isAllowed ? 'text-slate-600' : (item.unrealizedPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>{isAllowed && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}</td>
                     <td className={`py-5 pl-2 pr-4 text-right font-bold ${!isAllowed ? 'text-slate-600' : (item.returnRate >= 0 ? 'text-green-600' : 'text-red-600')}`}>{isAllowed ? formatPercent(item.returnRate) : "****"}</td>
@@ -70,9 +70,9 @@ export default function Portfolio({ marketPrices, portfolioStats, allocationData
           </div>
 
           {/* Mobile Card View - 持倉損益 (新增：3欄佈局) */}
-          <div className="md:hidden space-y-4 mt-4">
+          <div className="ledger-mobile-list md:hidden space-y-4">
             {portfolioStats.holdingsList.map(item => (
-              <div key={item.ticker} className="bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm">
+              <div key={item.ticker} className="ledger-record holding-record">
                 {/* 頭部：代號與狀態 */}
                 <div className="flex justify-between items-center mb-3">
                   <div className="flex items-center gap-2">
@@ -85,16 +85,16 @@ export default function Portfolio({ marketPrices, portfolioStats, allocationData
                 </div>
 
                 {/* 數據 Grid (3 columns) */}
-                <div className="grid grid-cols-3 gap-2 text-sm mt-3">
-                  <div className="bg-white p-2 rounded-lg border border-slate-100 flex flex-col justify-center">
+                <div className="holding-metrics grid grid-cols-3 gap-2 text-sm mt-3">
+                  <div className="holding-metric flex flex-col justify-center">
                     <div className="text-slate-400 text-[10px] mb-1">持有股數</div>
                     <div className="font-medium text-slate-700">{item.qty}</div>
                   </div>
-                  <div className="bg-white p-2 rounded-lg border border-slate-100 flex flex-col justify-center">
+                  <div className="holding-metric flex flex-col justify-center">
                     <div className="text-slate-400 text-[10px] mb-1">成本均價</div>
                     <div className="font-medium text-slate-700">{formatOriginalMoney(item.avgCostOriginal, item.isUS)}</div>
                   </div>
-                  <div className="bg-white p-2 rounded-lg border border-slate-200 flex flex-col justify-center">
+                  <div className="holding-metric holding-price-tile flex flex-col justify-center">
                     <div className="text-slate-400 text-[10px] mb-1">現價</div>
                     <input
                       aria-label={`${item.ticker} 現價`}
@@ -104,13 +104,13 @@ export default function Portfolio({ marketPrices, portfolioStats, allocationData
                       value={priceInputs[item.ticker] || ''}
                       onChange={e => handlePriceChange(item.ticker, e.target.value)}
                       placeholder={item.avgCostOriginal.toFixed(1)}
-                      className={`w-full outline-none font-bold text-sm ${isAdmin ? 'text-brand-600' : 'text-slate-600 bg-transparent'}`}
+                      className={`price-input w-full font-medium text-sm ${isAdmin ? 'text-brand-600' : 'text-slate-600 bg-transparent'}`}
                     />
                   </div>
                 </div>
 
                 {/* 底部總結：市值與損益 */}
-                <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between items-center">
+                <div className="holding-total mt-4 pt-4 border-t border-slate-200 flex flex-wrap gap-3 justify-between items-center">
                   <div>
                     <div className="text-xs text-slate-400">市值 (TWD)</div>
                     <div className="font-bold text-slate-800 text-lg">{secureMoney(item.currentValue)}</div>
