@@ -40,7 +40,7 @@ test('snapshot ownership uses units after full redemption and retains valuation 
   assert.equal(result.Yi, 0);
   assert.equal(result.Ma, result.total);
   assert.equal(result.total, 800);
-  assert.equal(result.calculationVersion, 2);
+  assert.equal(result.calculationVersion, 3);
   assert.equal(JSON.parse(result.valuationDetails).investorData.Yi.units, 0);
 });
 
@@ -71,4 +71,30 @@ test('preview cannot write data and scheduled execution writes one verifiable sn
   assert.equal(writes[0][0], 'asset_history');
   assert.equal(writes[0][1].total, 0);
   assert.equal(writes[0][1].date, '2026-11-17');
+});
+
+test('legacy installations without a revision document still produce a readonly preview', () => {
+  const db = {
+    getDocuments: () => [],
+    getDocument: path => { if (path === 'settings/ledger_control') throw new Error('404 NOT_FOUND'); return {}; },
+    createDocument: () => assert.fail('preview must not write'),
+  };
+  const context = runtime({ FIREBASE_CONFIG: { email: 'test', key: 'test', projectId: 'test' },
+    FirestoreApp: { getFirestore: () => db }, Logger: { log: () => {} },
+    Utilities: { formatDate: () => '2026-11-18' } });
+  assert.equal(context.previewDailySnapshot().total, 0);
+});
+test('snapshots refuse mixed ledger reads during concurrent writes', () => {
+  let revision = 0;
+  const db = { getDocuments: () => [], getDocument: path => path === 'settings/ledger_control' ? { revision: revision++ } : {},
+    createDocument: () => assert.fail('inconsistent snapshot must not write') };
+  const context = runtime({ FIREBASE_CONFIG: { email: 'test', key: 'test', projectId: 'test' },
+    FirestoreApp: { getFirestore: () => db }, Logger: { log: () => {} }, Utilities: { formatDate: () => '2026-11-18' } });
+  assert.throws(() => context.recordDailySnapshot(), /Ledger changed/);
+});
+test('Firestore document IDs survive normalization for deterministic time ties', () => {
+  const { normalizeSnapshotDocuments } = runtime();
+  assert.equal(normalizeSnapshotDocuments([{ name: 'projects/test/databases/(default)/documents/trades/abc',
+    fields: { qty: { integerValue: '1' } } }])[0].id, 'abc');
+  assert.equal(normalizeSnapshotDocuments({ def: { qty: 1 } })[0].id, 'def');
 });
