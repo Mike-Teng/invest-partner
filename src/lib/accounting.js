@@ -38,7 +38,9 @@ export function calculateUnitAccounting({ funds, investors, historyData, totalAs
     units: 0, deposits: 0, withdrawals: 0, netContributions: 0,
   }]));
   const sortedFunds = [...funds].sort((a, b) =>
-    a.date.localeCompare(b.date) || (numberOrNull(a.createdAt) ?? 0) - (numberOrNull(b.createdAt) ?? 0));
+    a.date.localeCompare(b.date)
+    || (numberOrNull(a.effectiveAt ?? a.createdAt) ?? 0) - (numberOrNull(b.effectiveAt ?? b.createdAt) ?? 0)
+    || String(a.id || '').localeCompare(String(b.id || '')));
   const sortedHistory = [...historyData].sort((a, b) =>
     a.date.localeCompare(b.date) || (numberOrNull(a.timestamp) ?? 0) - (numberOrNull(b.timestamp) ?? 0));
   const enrichedFunds = [];
