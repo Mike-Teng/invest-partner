@@ -380,7 +380,6 @@ export default function App() {
         {isAllowed && (
           <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
             <div className="flex items-center">
-              <span className="bg-orange-100 text-orange-600 px-2 py-1 rounded mr-2">單位淨值法</span>
               <span>當前淨值: <span className="font-bold text-slate-800">{formatPrice(unitStats.currentUnitPrice)}</span></span>
             </div>
             <div className="flex items-center">
@@ -392,7 +391,6 @@ export default function App() {
 
         {/* 1. 資產/獲利趨勢折線圖 */}
         {isAllowed && !operationsReady && <p className="text-sm text-amber-700">歷史異動紀錄尚未讀取完成，舊快照收益暫不顯示。若持續出現，請確認資料讀取權限。</p>}
-        {isAllowed && chartData.some(point => point.approximateCashFlows) && <p className="text-xs text-slate-500">部分舊紀錄沒有實際發生時間，同日資金以日期估算；原始快照未變更。</p>}
         {isAllowed && chartData.length > 0 && (
           <Card className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
@@ -1269,12 +1267,7 @@ export default function App() {
             {activeTab === 'portfolio' && '更新市價以計算未實現損益'}
           </p>
         </header>
-        {isAllowed && portfolioStats.warnings.length > 0 && <div role="status" className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <p className="font-bold">帳務資料待核對</p>
-        {portfolioStats.warnings.map(warning => <p key={warning}>{warning}</p>)}
-        <p className="mt-1">原始紀錄已保留；帳面現金與收益仍可能受缺漏紀錄影響。</p>
-      </div>}
-      {renderContent()}
+        {renderContent()}
       </main>
 
       {deleteModal.show && (

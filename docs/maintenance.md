@@ -43,7 +43,7 @@ After review and verification, commit and push to GitHub for Vercel to deploy. I
 
 A submission lock, stable operation IDs, and Firestore transaction revision checks protect against duplicate submissions and concurrent overselling. Trade tests include offline simulations of concurrency and retries after lost acknowledgements. Refresh older browser tabs after deployment; this protection applies to writes through the updated app.
 
-Historical calculations include only cash flows before the snapshot when a same-day timestamp is available. Records without sufficient timing information are marked as estimates.
+Historical calculations include only cash flows before the snapshot when a same-day timestamp is available. When timing information is missing, the calculation retains a date-based estimate.
 
 ### Audit records and existing data
 
