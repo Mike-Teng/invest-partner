@@ -1,7 +1,15 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { calculateUnitAccounting, calculatePerformance, summarizeCashFlows, createFundTransaction } from './lib/accounting.js';
+import { calculatePortfolio } from './lib/portfolio.js';
+import { prepareFundNavEdit, prepareFundEntry, fundEntryContext, assertSafeFundChange } from './lib/fundChanges.js';
+import { prepareTradeEntry, assertSafeTradeChange } from './lib/tradeChanges.js';
+import { saveLedgerChange, ledgerOperationsCollection, readHistoryBasis } from './lib/firestoreLedger.js';
+import { stableValue } from './lib/ledgerCommit.js';
+import { historicalPerformance } from './lib/history.js';
+import { buildSnapshot } from './lib/snapshot.js';
+import { taipeiDate } from './lib/entryTime.js';
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove, query, orderBy, getDocs, writeBatch } from "firebase/firestore";
+import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, arrayUnion, arrayRemove, query, orderBy, getDocs, writeBatch } from "firebase/firestore";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
@@ -106,6 +114,27 @@ export default function App() {
   const [trades, setTrades] = useState([]);
   const [marketPrices, setMarketPrices] = useState({});
   const [historyData, setHistoryData] = useState([]);
+  const [ledgerOperations, setLedgerOperations] = useState([]);
+  const [operationsReady, setOperationsReady] = useState(false);
+  const [historyBasis, setHistoryBasis] = useState({ funds: [], operations: [] });
+
+  const writeInFlight = useRef(false);
+  const pendingOperation = useRef(null);
+  const changeLedger = async (key, input, prepare) => {
+    if (!isAdmin) throw new Error('僅管理員可操作');
+    if (writeInFlight.current) throw new Error('上一筆資料仍在儲存，請稍候');
+    const signature = stableValue({ key, input });
+    if (pendingOperation.current?.signature !== signature) {
+      pendingOperation.current = { signature, id: crypto.randomUUID() };
+    }
+    const operationId = pendingOperation.current.id;
+    writeInFlight.current = true;
+    try {
+      const result = await saveLedgerChange(db, operationId, user.uid, ledger => prepare(ledger, operationId));
+      pendingOperation.current = null;
+      return result;
+    } finally { writeInFlight.current = false; }
+  };
 
   const [deleteModal, setDeleteModal] = useState({ show: false, message: '', onConfirm: null });
   const [newEmail, setNewEmail] = useState('');
@@ -186,6 +215,23 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isAllowed) return;
+    return onSnapshot(ledgerOperationsCollection(db), snapshot => {
+      setLedgerOperations(snapshot.docs.map(item => ({ ...item.data(), id: item.id })));
+    }, () => { setOperationsReady(false); });
+  }, [isAllowed]);
+
+  useEffect(() => {
+    if (!isAllowed) return;
+    let cancelled = false;
+    setOperationsReady(false);
+    readHistoryBasis(db).then(basis => {
+      if (!cancelled) { setHistoryBasis(basis); setOperationsReady(true); }
+    }).catch(() => { if (!cancelled) setOperationsReady(false); });
+    return () => { cancelled = true; };
+  }, [isAllowed, funds, ledgerOperations]);
+
   // --- 權限管理 ---
   const handleAddEmail = async (e) => {
     e.preventDefault();
@@ -232,70 +278,9 @@ export default function App() {
     return { totalCapital, investorContributions };
   }, [funds, investors]);
 
-  const portfolioStats = useMemo(() => {
-    let cashBalance = capitalStats.totalCapital;
-    const holdings = {};
-
-    // 先依照日期排序交易紀錄
-    const sortedTrades = [...trades].sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    sortedTrades.forEach(t => {
-      const isUS = /^[A-Z]+$/.test(t.ticker);
-      const rate = isUS ? exchangeRate : 1;
-      const price = safeNumber(t.price);
-      const qty = safeNumber(t.qty);
-      const totalAmountTWD = price * qty * rate;
-      const totalAmountOriginal = price * qty;
-
-      if (t.type === 'BUY') {
-        cashBalance -= totalAmountTWD;
-        if (!holdings[t.ticker]) holdings[t.ticker] = { qty: 0, totalCostOriginal: 0, isUS };
-        holdings[t.ticker].qty += qty;
-        holdings[t.ticker].totalCostOriginal += totalAmountOriginal;
-      } else {
-        cashBalance += totalAmountTWD;
-        if (holdings[t.ticker]) {
-          const avgCost = holdings[t.ticker].totalCostOriginal / (holdings[t.ticker].qty || 1);
-          holdings[t.ticker].qty -= qty;
-          holdings[t.ticker].totalCostOriginal -= avgCost * qty;
-        }
-      }
-    });
-
-    let marketValue = 0;
-    const holdingsList = Object.keys(holdings).map(ticker => {
-      const data = holdings[ticker];
-      if (data.qty <= 0) return null;
-
-      const isUS = data.isUS;
-      const rate = isUS ? exchangeRate : 1;
-
-      const currentPriceOriginal = safeNumber(marketPrices[ticker]) || (data.totalCostOriginal / (data.qty || 1));
-
-      const marketValueOriginal = data.qty * currentPriceOriginal;
-      const currentValueTWD = marketValueOriginal * rate;
-      marketValue += currentValueTWD;
-
-      const totalCostTWD = data.totalCostOriginal * rate;
-      const avgCostOriginal = data.totalCostOriginal / (data.qty || 1);
-      const unrealizedPL = currentValueTWD - totalCostTWD;
-      const returnRate = totalCostTWD > 0 ? (unrealizedPL / totalCostTWD) : 0;
-
-      return {
-        ticker,
-        isUS,
-        qty: data.qty,
-        avgCostOriginal,
-        currentPriceOriginal,
-        marketValueOriginal,
-        currentValue: currentValueTWD,
-        unrealizedPL,
-        returnRate
-      };
-    }).filter(Boolean);
-
-    return { cashBalance, marketValue, holdingsList };
-  }, [trades, capitalStats.totalCapital, marketPrices, exchangeRate]);
+  const portfolioStats = useMemo(() => calculatePortfolio(
+    trades, capitalStats.totalCapital, marketPrices,
+  ), [trades, capitalStats.totalCapital, marketPrices]);
 
   // Stored signed units are the source of truth; cash flows remain separate.
   const unitStats = useMemo(() => calculateUnitAccounting({
@@ -322,23 +307,16 @@ export default function App() {
     if (!window.confirm("確定要記錄當下的資產總值到歷史趨勢圖嗎？")) return;
 
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const userValues = {};
-      investors.forEach(inv => {
-        const units = unitStats.investorData[inv]?.units || 0;
-        userValues[inv] = units * unitStats.currentUnitPrice;
-      });
-
-      await addDoc(collection(db, "asset_history"), {
-        date: today,
-        timestamp: Date.now(),
-        total: unitStats.totalAssets,
-        ...userValues
+      await changeLedger('snapshot', {}, (ledger, id) => {
+        const timestamp = Date.now();
+        return { collection: 'asset_history', id, before: null,
+          after: { id, ...buildSnapshot(ledger.funds, ledger.trades, ledger.marketPrices,
+            ledger.historyData, taipeiDate(timestamp), timestamp) } };
       });
       alert("已成功記錄今日資產快照！");
     } catch (error) {
       console.error("Error recording history:", error);
-      alert("記錄失敗");
+      alert(error.message || "記錄失敗");
     }
   };
 
@@ -378,15 +356,11 @@ export default function App() {
     const displayROI = display.returnOnDeposits;
     const titlePrefix = isSpecificInvestor ? '我的' : '總';
 
-    // Historical snapshots are unchanged; subtract net cash flows, not deposits alone.
     const chartData = historyData.map(h => {
-      const fundsAtDate = funds.filter(f => f.date <= h.date);
-      const total = calculatePerformance({ assets: h.total, ...summarizeCashFlows(fundsAtDate) });
-      const personal = calculatePerformance({
-        assets: h[currentInvestorName] || 0,
-        ...summarizeCashFlows(fundsAtDate.filter(f => f.investor === currentInvestorName)),
-      });
-      return { ...h, totalProfit: total.profit, meProfit: personal.profit };
+      const point = historicalPerformance(h, historyBasis.funds, historyBasis.operations, currentInvestorName);
+      // Never show a legacy profit from an incompletely loaded audit trail.
+      if (!operationsReady && !point.frozenCashFlows) return { ...point, totalProfit: null, meProfit: null };
+      return point;
     });
 
     return (
@@ -417,6 +391,8 @@ export default function App() {
         )}
 
         {/* 1. 資產/獲利趨勢折線圖 */}
+        {isAllowed && !operationsReady && <p className="text-sm text-amber-700">歷史異動紀錄尚未讀取完成，舊快照收益暫不顯示。若持續出現，請確認資料讀取權限。</p>}
+        {isAllowed && chartData.some(point => point.approximateCashFlows) && <p className="text-xs text-slate-500">部分舊紀錄沒有實際發生時間，同日資金以日期估算；原始快照未變更。</p>}
         {isAllowed && chartData.length > 0 && (
           <Card className="p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
@@ -687,17 +663,22 @@ export default function App() {
   };
 
   const FundManager = () => {
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(taipeiDate());
     const [investor, setInvestor] = useState(investors[0]);
     const [amount, setAmount] = useState('');
+    const [time, setTime] = useState('');
+    const [historicalNav, setHistoricalNav] = useState('');
     // 新增狀態：判斷是入金還是提領
     const [fundType, setFundType] = useState('DEPOSIT');
 
     // 計算當下預估能買到/賣出的單位數 (顯示用)
-    const estPrice = unitStats.currentUnitPrice;
+    let context = null;
+    try { context = fundEntryContext({ funds, historyData, investor, date, time: date < taipeiDate() ? time : undefined }); } catch { /* Input is incomplete. */ }
+    const requiresHistoricalNav = date < taipeiDate() || context?.requiresHistoricalNav;
+    const estPrice = requiresHistoricalNav ? Number(historicalNav) : unitStats.currentUnitPrice;
     // 取得當前選定投資人的最大可提領狀態
-    const currentInvestorData = unitStats.investorData[investor] || { units: 0 };
-    const maxWithdrawValue = currentInvestorData.units * unitStats.currentUnitPrice;
+    const currentInvestorData = { units: context?.ownedUnits || 0 };
+    const maxWithdrawValue = currentInvestorData.units * estPrice;
     // Preview the same signed units that will be saved, including full redemption.
     let estUnits = 0;
     if (amount) {
@@ -719,38 +700,28 @@ export default function App() {
     const handleAddFund = async (e) => {
       e.preventDefault();
       if (!isAdmin) return;
-      if (unitStats.hasUnallocatedAssets) {
-        alert('所有單位已結清，但帳上仍有未分配資產。請先核對結清差額，再新增資金紀錄。');
-        return;
-      }
-      let transaction;
       const isWithdraw = fundType === 'WITHDRAW';
+      const button = e.currentTarget.querySelector('[type="submit"]');
+      if (button) button.disabled = true;
       try {
-        transaction = createFundTransaction({
-          amount: Number(amount),
-          isWithdrawal: isWithdraw,
-          unitPrice: unitStats.currentUnitPrice,
-          ownedUnits: currentInvestorData.units,
+        const result = await changeLedger('add-fund', { investor, date, time, amount, fundType, historicalNav }, (ledger, id) => {
+          const totals = summarizeCashFlows(ledger.funds);
+          const portfolio = calculatePortfolio(ledger.trades, totals.netContributions, ledger.marketPrices);
+          const accounting = calculateUnitAccounting({ ...ledger, investors, totalAssets: portfolio.totalAssets });
+          const after = prepareFundEntry({ ...ledger, id, investor, date,
+            time: date < taipeiDate() ? time : undefined,
+            amount: Number(amount), isWithdrawal: isWithdraw, historicalNav,
+            currentNav: accounting.currentUnitPrice, hasUnallocatedAssets: accounting.hasUnallocatedAssets });
+          return { collection: 'funds', id, before: null, after };
         });
-      } catch (error) {
-        alert(error.message);
-        return;
-      }
-
-      try {
-        await addDoc(collection(db, "funds"), {
-          date,
-          investor,
-          ...transaction,
-          createdAt: Date.now()
-        });
+        const transaction = result.after;
         setAmount('');
         const actionName = isWithdraw ? '提領' : '入金';
         alert(`${actionName}成功！\n日期: ${date}\n成交淨值: ${formatPrice(transaction.buyPrice)}\n${actionName}單位: ${new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 }).format(Math.abs(transaction.units))}`);
       } catch (error) {
         console.error("Error adding document: ", error);
-        alert("寫入失敗");
-      }
+        alert(error.message || "寫入失敗");
+      } finally { if (button) button.disabled = false; }
     };
 
     const handleDelete = (id) => {
@@ -759,9 +730,15 @@ export default function App() {
         message: '確定要刪除這筆資金紀錄嗎？',
         onConfirm: async () => {
           try {
-            await deleteDoc(doc(db, "funds", id));
+            await changeLedger('delete-fund', { id }, ledger => {
+              const before = ledger.funds.find(fund => fund.id === id);
+              if (!before) throw new Error('找不到這筆紀錄，請重新整理');
+              assertSafeFundChange(ledger.funds, ledger.funds.filter(fund => fund.id !== id), ledger.historyData, id);
+              return { collection: 'funds', id, before, after: null };
+            });
           } catch (error) {
             console.error("Error deleting document: ", error);
+            alert(error.message || '刪除失敗');
           }
         }
       });
@@ -774,24 +751,18 @@ export default function App() {
       const newNavStr = prompt(`修正 ${fund.date} 的成交淨值 (目前: ${currentBuyPrice.toFixed(2)})`, currentBuyPrice);
       if (newNavStr === null) return;
 
-      const newNav = parseFloat(newNavStr);
-      if (isNaN(newNav) || newNav <= 0) {
-        alert("請輸入有效的數字");
-        return;
-      }
-
-      // 重新計算單位數
-      const newUnits = fund.amount / newNav;
-
       try {
-        await updateDoc(doc(db, "funds", fund.id), {
-          buyPrice: newNav,
-          units: newUnits
+        const result = await changeLedger('edit-fund-nav', { id: fund.id, newNav: Number(newNavStr) }, ledger => {
+          const update = prepareFundNavEdit({ ...ledger, fundId: fund.id, newNav: Number(newNavStr) });
+          if (!update) return null;
+          const before = ledger.funds.find(item => item.id === fund.id);
+          return { collection: 'funds', id: fund.id, before, after: { ...before, ...update } };
         });
+        if (!result) return;
         alert("已更新淨值與單位數！");
       } catch (error) {
         console.error("Update failed", error);
-        alert("更新失敗");
+        alert(error.message || "更新失敗");
       }
     };
 
@@ -817,7 +788,7 @@ export default function App() {
                 <div className="flex justify-between items-end">
                   <div>
                     <div className="text-xs text-slate-500 mb-1">預估成交價</div>
-                    <div className="text-xl font-bold text-slate-800">{formatMoney(estPrice)}</div>
+                    <div className="text-xl font-bold text-slate-800">{estPrice > 0 ? formatPrice(estPrice) : '待填當時淨值'}</div>
                   </div>
                   <div className="text-right">
                     <div className="text-xs text-slate-500 mb-1">{fundType === 'DEPOSIT' ? '預估購入單位' : '預估註銷單位'}</div>
@@ -843,6 +814,15 @@ export default function App() {
                   <label className="block text-sm font-bold text-slate-500 mb-2">日期</label>
                   <input type="date" required value={date} onChange={e => setDate(e.target.value)} className="input-field" />
                 </div>
+                {date < taipeiDate() && <div>
+                  <label className="block text-sm font-bold text-slate-500 mb-2">實際發生時間（台灣時間）</label>
+                  <input type="time" required value={time} onChange={e => setTime(e.target.value)} className="input-field" />
+                </div>}
+                {requiresHistoricalNav && <div>
+                  <label className="block text-sm font-bold text-slate-500 mb-2">當時成交淨值</label>
+                  <input type="number" step="any" min="0.00000001" required value={historicalNav} onChange={e => setHistoricalNav(e.target.value)} className="input-field" />
+                  <p className="text-xs text-slate-500 mt-2">請依當時對帳紀錄填寫。補登不會自動重算後續提領或改寫舊快照。</p>
+                </div>}
                 <div>
                   <label className="block text-sm font-bold text-slate-500 mb-2">合夥人</label>
                   <select value={investor} onChange={e => setInvestor(e.target.value)} className="input-field">
@@ -994,7 +974,8 @@ export default function App() {
   };
 
   const TradeManager = () => {
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState(taipeiDate());
+    const [time, setTime] = useState('');
     const [ticker, setTicker] = useState('');
     const [type, setType] = useState('BUY');
     const [price, setPrice] = useState('');
@@ -1002,20 +983,30 @@ export default function App() {
 
     const handleAddTrade = async (e) => {
       e.preventDefault();
-      if (!ticker || !price || !qty) return;
+      const button = e.currentTarget.querySelector('[type="submit"]');
+      if (button) button.disabled = true;
       try {
-        await addDoc(collection(db, "trades"), {
-          date,
-          ticker: ticker.toUpperCase(),
-          type,
-          price: parseFloat(price),
-          qty: parseFloat(qty),
-          createdAt: Date.now()
-        });
+        await changeLedger('add-trade', { date, time, ticker, type, price, qty }, (ledger, id) => ({
+          collection: 'trades', id, before: null,
+          after: prepareTradeEntry({ ...ledger, id, date, time: date < taipeiDate() ? time : undefined,
+            ticker, type, price: Number(price), qty: Number(qty) }),
+        }));
         setTicker(''); setPrice(''); setQty('');
-      } catch (error) { console.error(error); }
+      } catch (error) { alert(error.message || '新增失敗'); }
+      finally { if (button) button.disabled = false; }
     };
-    const handleDelete = async (id) => { if (window.confirm("刪除？")) await deleteDoc(doc(db, "trades", id)); };
+    const handleDelete = async (id) => {
+      if (!window.confirm('刪除這筆交易？')) return;
+      try {
+        await changeLedger('delete-trade', { id }, ledger => {
+          const before = ledger.trades.find(trade => trade.id === id);
+          if (!before) throw new Error('找不到這筆紀錄，請重新整理');
+          assertSafeTradeChange({ beforeTrades: ledger.trades, afterTrades: ledger.trades.filter(trade => trade.id !== id),
+            funds: ledger.funds, exchangeRate: Number(ledger.marketPrices.USDTWD) || 32.5 });
+          return { collection: 'trades', id, before, after: null };
+        });
+      } catch (error) { alert(error.message || '刪除失敗'); }
+    };
 
     return (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -1024,12 +1015,13 @@ export default function App() {
             <Card className="p-6 sticky top-6">
               <h3 className="font-bold text-slate-700 mb-6 flex items-center text-lg"><div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg mr-3"><TrendingUp className="w-5 h-5" /></div>紀錄交易</h3>
               {/* 修正：使用 portfolioStats.cashBalance 顯示正確的現金餘額 */}
-              <div className="mb-5 p-4 bg-slate-50/60 rounded-xl border border-slate-100/60"><span className="text-xs font-bold text-slate-400 uppercase block mb-1">可用現金餘額</span><span className="font-mono text-xl font-bold text-slate-700">{secureMoney(portfolioStats.cashBalance)}</span></div>
+              <div className="mb-5 p-4 bg-slate-50/60 rounded-xl border border-slate-100/60"><span className="text-xs font-bold text-slate-400 uppercase block mb-1">帳面現金餘額</span><span className="font-mono text-xl font-bold text-slate-700">{secureMoney(portfolioStats.cashBalance)}</span></div>
               <form onSubmit={handleAddTrade} className="space-y-5">
                 <div className="toggle-switch"><button type="button" onClick={() => setType('BUY')} className={`flex-1 py-2 rounded-lg font-bold text-sm toggle-option ${type === 'BUY' ? 'toggle-option-active text-red-600' : 'toggle-option-inactive'}`}>買入</button><button type="button" onClick={() => setType('SELL')} className={`flex-1 py-2 rounded-lg font-bold text-sm toggle-option ${type === 'SELL' ? 'toggle-option-active text-green-600' : 'toggle-option-inactive'}`}>賣出</button></div>
                 <div><label className="block text-sm font-bold text-slate-500 mb-2">日期</label><input type="date" value={date} onChange={e => setDate(e.target.value)} className="input-field" /></div>
+                {date < taipeiDate() && <div><label className="block text-sm font-bold text-slate-500 mb-2">實際成交時間（台灣時間）</label><input type="time" required value={time} onChange={e => setTime(e.target.value)} className="input-field" /></div>}
                 <div><label className="block text-sm font-bold text-slate-500 mb-2">代號</label><input type="text" value={ticker} onChange={e => setTicker(e.target.value)} className="input-field uppercase" placeholder="如: 2330" /></div>
-                <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-slate-500 mb-2">價格</label><input type="number" step="0.01" value={price} onChange={e => setPrice(e.target.value)} className="input-field" /></div><div><label className="block text-sm font-bold text-slate-500 mb-2">股數</label><input type="number" step="1" value={qty} onChange={e => setQty(e.target.value)} className="input-field" /></div></div>
+                <div className="grid grid-cols-2 gap-4"><div><label className="block text-sm font-bold text-slate-500 mb-2">價格</label><input type="number" required min="0.00000001" step="any" value={price} onChange={e => setPrice(e.target.value)} className="input-field" /></div><div><label className="block text-sm font-bold text-slate-500 mb-2">股數</label><input type="number" required min="0.00000001" step="any" value={qty} onChange={e => setQty(e.target.value)} className="input-field" /></div></div>
                 <button type="submit" className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-3 px-4 rounded-xl shadow-brand-500/20 hover:shadow-glow-sm transition-all duration-200 active:scale-[0.97]">新增紀錄</button>
               </form>
             </Card>
@@ -1277,7 +1269,12 @@ export default function App() {
             {activeTab === 'portfolio' && '更新市價以計算未實現損益'}
           </p>
         </header>
-        {renderContent()}
+        {isAllowed && portfolioStats.warnings.length > 0 && <div role="status" className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <p className="font-bold">帳務資料待核對</p>
+        {portfolioStats.warnings.map(warning => <p key={warning}>{warning}</p>)}
+        <p className="mt-1">原始紀錄已保留；帳面現金與收益仍可能受缺漏紀錄影響。</p>
+      </div>}
+      {renderContent()}
       </main>
 
       {deleteModal.show && (
