@@ -1,10 +1,13 @@
-# InvestPartner
+<h1 align="center">
+  <img src="public/icons/partner-glass-v1/icon-180.png" alt="" width="56" height="56" align="middle" />
+  InvestPartner
+</h1>
 
-**Invest together. Keep the numbers clear.**
+<p align="center"><strong>Invest together. Keep the numbers clear.</strong></p>
 
 InvestPartner is a shared investment tracker for partners. Keep deposits, withdrawals, and stock trades in one place, so everyone can see the portfolio's value, cumulative profit, and their share of the investment.
 
-![InvestPartner dashboard showing portfolio growth, performance, and each partner's share](docs/images/dashboard.jpg)
+![InvestPartner's frosted-glass dashboard with total assets, cumulative profit, portfolio growth, and partner equity](docs/images/dashboard.jpg)
 
 *English preview with fictional names and sample data. The live app currently uses Traditional Chinese.*
 
