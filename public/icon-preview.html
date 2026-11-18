@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/partner-glass-v1/icon-32.png" />
+    <title>App 圖示預覽 · InvestPartner</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { margin: 0; background: #eae8e1; color: #263e35; font-family: system-ui, sans-serif; }
+      main { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+      h1 { margin: 0 0 12px; font-size: 28px; font-weight: 600; }
+      h2 { margin: 0 0 24px; font-size: 16px; font-weight: 600; }
+      p { margin: 0; line-height: 1.7; color: #59645b; }
+      a { display: inline-block; padding: 12px 0; color: #29453b; text-underline-offset: 4px; }
+      .samples { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 28px 0; }
+      section { min-width: 0; padding: 28px; border: 1px solid #fff9; border-radius: 24px; background: #ffffff50; box-shadow: 0 8px 24px #263e3508; }
+      .browser { grid-column: 1 / -1; }
+      .tabbar { display: flex; gap: 8px; align-items: end; background: #d9ddd6; padding: 12px 12px 0; border-radius: 14px 14px 0 0; }
+      .tab { display: flex; align-items: center; gap: 10px; min-width: 0; width: 240px; padding: 13px 16px; background: #fafaf7; border-radius: 10px 10px 0 0; font-size: 13px; }
+      .tab img { flex-shrink: 0; width: 16px; height: 16px; }
+      .tab span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .address { padding: 12px 16px; background: #fafaf7; border-radius: 0 0 14px 14px; font-size: 12px; color: #606b62; overflow-wrap: anywhere; }
+      .home { display: flex; justify-content: center; align-items: center; gap: 36px; padding: 16px 0 8px; }
+      figure { margin: 0; text-align: center; }
+      .home img { display: block; width: 64px; height: 64px; margin: 0 auto 12px; box-shadow: 0 3px 8px #263e3518; }
+      .rounded { border-radius: 15px; }
+      .circle { border-radius: 50%; }
+      figcaption { font-size: 12px; }
+      .sizes { display: flex; gap: 32px; align-items: end; min-height: 112px; justify-content: center; }
+      .sizes img { display: block; margin: 0 auto 14px; }
+      .note { font-size: 13px; }
+      @media (max-width: 560px) { main { padding: 28px 16px; } .samples { grid-template-columns: 1fr; gap: 16px; } section { padding: 22px; } h1 { font-size: 24px; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>App 圖示預覽</h1>
+      <p>暖灰底與深墨綠雙片交疊，僅套用於測試版。</p>
+      <a href="/">開啟測試版 →</a>
+      <div class="samples">
+        <section class="browser" aria-labelledby="browser-heading">
+          <h2 id="browser-heading">瀏覽器分頁示意</h2>
+          <div class="tabbar"><div class="tab"><img src="/icons/partner-glass-v1/icon-32.png" alt="" /><span>InvestPartner</span></div></div>
+          <div class="address">invest-partner · 測試版</div>
+        </section>
+        <section aria-labelledby="home-heading">
+          <h2 id="home-heading">手機主畫面裁切示意</h2>
+          <div class="home">
+            <figure><img class="rounded" src="/icons/partner-glass-v1/icon-180.png" alt="圓角方形 App 圖示" /><figcaption>IP Preview</figcaption></figure>
+            <figure><img class="circle" src="/icons/partner-glass-v1/icon-512.png" alt="圓形 App 圖示" /><figcaption>IP Preview</figcaption></figure>
+          </div>
+        </section>
+        <section aria-labelledby="sizes-heading">
+          <h2 id="sizes-heading">小尺寸辨識度</h2>
+          <div class="sizes">
+            <figure><img width="16" height="16" src="/icons/partner-glass-v1/icon-16.png" alt="16 像素圖示" /><figcaption>16 px</figcaption></figure>
+            <figure><img width="32" height="32" src="/icons/partner-glass-v1/icon-32.png" alt="32 像素圖示" /><figcaption>32 px</figcaption></figure>
+            <figure><img width="48" height="48" src="/icons/partner-glass-v1/icon-48.png" alt="48 像素圖示" /><figcaption>48 px</figcaption></figure>
+          </div>
+        </section>
+      </div>
+      <p class="note">以上為尺寸與裁切示意；實際外觀依裝置與系統設定而異。請從測試版首頁加入主畫面，名稱為「IP Preview」，方便與正式版區分。</p>
+    </main>
+  </body>
+</html>

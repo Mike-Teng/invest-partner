@@ -37,6 +37,24 @@ shader cannot load or WebGL is unavailable. Cards, charts, and inputs retain the
 existing surfaces. The dependency is pinned to avoid unreviewed visual changes.
 Its license and notice are included in `public/licenses/paper-shaders/`.
 
+## App icon trial
+
+The `codex/ui-preview` branch uses the approved warm-gray and forest-green
+overlapping-pane artwork. `docs/images/partner-glass-source.png` preserves the
+original; the PNG/ICO exports in `public/icons/partner-glass-v1/` are resized
+copies. Versioned URLs keep them separate from the existing production icon.
+The original `public/icon.png` remains unchanged.
+
+The preview supplies 16/32/48 px browser icons, a 180 px Apple touch icon, and
+192/512 px manifest icons. The opaque background and centered mark support
+launcher masking. The home-screen name is **IP Preview** so it can coexist with
+the production shortcut. This trial adds no service worker or offline caching.
+
+Open `/icon-preview.html` for labeled size/crop examples. To check a real phone,
+open the preview homepage and add it to the home screen. An existing shortcut
+may retain its old icon; add a fresh preview shortcut if necessary. Keep this
+trial on the preview branch until the icon is accepted for production.
+
 ## Demo data
 
 Run `npm run dev:demo` to try the interface with fictional Alex/Sam records.
