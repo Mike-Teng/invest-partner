@@ -49,6 +49,8 @@ The preview supplies 16/32/48 px browser icons, a 180 px Apple touch icon, and
 192/512 px manifest icons. The opaque background and centered mark support
 launcher masking. The home-screen name is **IP Preview** so it can coexist with
 the production shortcut. This trial adds no service worker or offline caching.
+The manifest uses same-origin credentials so browsers can load it after the
+existing Vercel preview sign-in; deployment protection remains enabled.
 
 Open `/icon-preview.html` for labeled size/crop examples. To check a real phone,
 open the preview homepage and add it to the home screen. An existing shortcut
