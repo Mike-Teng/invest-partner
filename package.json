@@ -9,7 +9,9 @@
     "build:snapshot": "node apps-script/build.mjs",
     "lint": "eslint .",
     "test": "node --test",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:demo": "vite --mode demo",
+    "build:demo": "vite build --mode demo"
   },
   "dependencies": {
     "firebase": "^12.7.0",
