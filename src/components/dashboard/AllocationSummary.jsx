@@ -1,14 +1,14 @@
 import { ArrowUpRight } from 'lucide-react';
 import Card from '../Card.jsx';
 import { formatMoney, formatPercent } from '../../lib/formatters.js';
-const colors = ['#5369da', '#39a99b', '#a3b7e6', '#e2b468'];
+const colors = ['#4a6d62', '#899c93', '#b5aaa0', '#777f8b'];
 
 export default function AllocationSummary({ portfolioStats, totalAssets, onNavigate }) {
   const items = [
     ...portfolioStats.holdingsList.map(item => ({ name: item.ticker, value: item.currentValue })),
     { name: '現金', value: portfolioStats.cashBalance },
   ].sort((a, b) => b.value - a.value);
-  return <Card className="p-6 flex flex-col min-w-0">
+  return <Card className="allocation-panel flex flex-col min-w-0">
     <div className="flex items-center justify-between gap-2"><h2 className="section-title">資產配置</h2><span className="text-xs text-slate-400">TWD</span></div>
     <p className="text-xs text-slate-400 mt-1.5 mb-7">持倉與現金的分布</p>
     <div className="allocation-bar" aria-hidden="true">{items.filter(item => item.value > 0).map((item, i) => <span key={item.name} style={{ flex: item.value, background: colors[i % colors.length] }} />)}</div>

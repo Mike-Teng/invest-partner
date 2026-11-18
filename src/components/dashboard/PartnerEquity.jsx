@@ -5,9 +5,9 @@ import { formatMoney, formatPercent, formatUnit } from '../../lib/formatters.js'
 
 export default function PartnerEquity({ investors, unitStats, currentInvestorName, isSpecificInvestor, isAllowed, secureMoney }) {
   const visibleInvestors = isSpecificInvestor ? investors.filter(name => name === currentInvestorName) : investors;
-  return <section aria-labelledby="partner-heading">
+  return <section className="partner-section" aria-labelledby="partner-heading">
     <div className="section-heading"><h2 id="partner-heading" className="section-title">合夥人權益</h2><span className="text-xs text-slate-400">依持有單位分配</span></div>
-    <div className="grid sm:grid-cols-2 gap-4">{visibleInvestors.map((name, index) => {
+    <div className="partner-grid">{visibleInvestors.map((name, index) => {
       const data = unitStats.investorData[name];
       const value = data.units * unitStats.currentUnitPrice;
       const performance = calculatePerformance({ assets: value, ...data });

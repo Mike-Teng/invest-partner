@@ -44,8 +44,8 @@ export default function TradeManager({ notify, trades, portfolioStats, isAdmin, 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {isAdmin ? (
           <div className="lg:col-span-1">
-            <Card className="p-6 sticky top-6">
-              <h3 className="font-bold text-slate-700 mb-6 flex items-center text-lg"><div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg mr-3"><TrendingUp className="w-5 h-5" /></div>紀錄交易</h3>
+            <Card className="p-6 entry-form-panel">
+              <h3 className="font-bold text-slate-700 mb-6 flex items-center text-lg"><div className="p-2 bg-brand-100 text-brand-600 rounded-lg mr-3"><TrendingUp className="w-5 h-5" /></div>紀錄交易</h3>
               {/* 修正：使用 portfolioStats.cashBalance 顯示正確的現金餘額 */}
               <div className="mb-5 p-4 bg-slate-50/60 rounded-xl border border-slate-100/60"><span className="text-xs font-bold text-slate-400 uppercase block mb-1">帳面現金餘額</span><span className="font-mono text-xl font-bold text-slate-700">{secureMoney(portfolioStats.cashBalance)}</span></div>
               <form onSubmit={handleAddTrade} className="space-y-5">

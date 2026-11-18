@@ -115,7 +115,7 @@ export default function FundManager({ notify, investors, funds, historyData, uni
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {isAdmin ? (
           <div className="lg:col-span-1">
-            <Card className="p-6 sticky top-6">
+            <Card className="p-6 entry-form-panel">
               <h3 className="font-bold text-slate-700 mb-6 flex items-center text-lg">
                 <div className={`p-2 rounded-lg mr-3 ${fundType === 'DEPOSIT' ? 'bg-brand-50 text-brand-600' : 'bg-orange-100 text-orange-600'}`}>
                   {fundType === 'DEPOSIT' ? <Plus className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
@@ -123,7 +123,7 @@ export default function FundManager({ notify, investors, funds, historyData, uni
                 資金異動
               </h3>
 
-              <div className="bg-blue-50 p-4 rounded-xl mb-6 border border-blue-100">
+              <div className="bg-brand-50 p-4 rounded-xl mb-6 border border-brand-100">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-bold text-slate-400">參考淨值狀態</span>
                   <span className={`text-xs px-2 py-0.5 rounded ${funds.length === 0 ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
@@ -258,7 +258,7 @@ export default function FundManager({ notify, investors, funds, historyData, uni
                         <td className="py-4 text-right font-mono text-slate-500 whitespace-nowrap pr-4 text-sm group cursor-pointer" onClick={() => handleEditNav(f)}>
                           <div className="flex items-center justify-end">
                             {formatPrice(f.buyPrice)}
-                            {isAdmin && <Pencil className="w-3 h-3 ml-2 opacity-0 group-hover:opacity-100 text-blue-400" />}
+                            {isAdmin && <Pencil className="w-3 h-3 ml-2 opacity-0 group-hover:opacity-100 text-brand-400" />}
                           </div>
                         </td>
                         <td className={`py-4 text-right font-mono whitespace-nowrap pr-4 text-sm ${isWithdraw ? 'text-orange-600' : 'text-slate-500'}`}>

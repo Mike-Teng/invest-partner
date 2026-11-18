@@ -4,7 +4,7 @@ import { formatMoney, formatOriginalMoney, formatPercent } from '../lib/formatte
 import { Save, PieChart as PieChartIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useReducedMotion } from '../hooks/useReducedMotion.js';
-const COLORS = ['#4f6df5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#6366f1'];
+const COLORS = ['#4a6d62', '#899c93', '#b5aaa0', '#777f8b', '#997e83', '#9c9b69', '#655b67'];
 
 export default function Portfolio({ marketPrices, portfolioStats, allocationData, isAdmin, isAllowed, secureMoney, saveMarketPrices }) {
     const [priceEdits, setPriceInputs] = useState({});
@@ -22,7 +22,7 @@ export default function Portfolio({ marketPrices, portfolioStats, allocationData
       <div className="space-y-6">
         {isAllowed && (
           <Card className="p-6">
-            <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center"><div className="p-2 bg-purple-100 text-purple-600 rounded-lg mr-3"><PieChartIcon className="w-5 h-5" /></div>資產配置 (台幣)</h3>
+            <h3 className="text-lg font-bold text-slate-700 mb-4 flex items-center"><div className="p-2 bg-brand-100 text-brand-600 rounded-lg mr-3"><PieChartIcon className="w-5 h-5" /></div>資產配置 (台幣)</h3>
             <div className="h-[300px] flex items-center justify-center">
               {allocationData.length > 0 ? (
                 <ResponsiveContainer><PieChart><Pie data={allocationData} cx="50%" cy="50%" innerRadius={70} outerRadius={110} fill="#8884d8" paddingAngle={5} dataKey="value" isAnimationActive={!reducedMotion} animationDuration={350} animationEasing="ease-out">{allocationData.map((entry, index) => (<Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />))}</Pie><Tooltip formatter={(v, n) => { const total = allocationData.reduce((a, c) => a + c.value, 0); return [`${formatMoney(v)} (${formatPercent(total > 0 ? v / total : 0)})`, n]; }} /><Legend /></PieChart></ResponsiveContainer>
@@ -58,7 +58,7 @@ export default function Portfolio({ marketPrices, portfolioStats, allocationData
                     <td className="py-5 px-4 text-right">{item.qty}</td>
                     <td className="py-5 px-4 text-right text-xs text-slate-500">{item.isUS ? <span className="bg-brand-50 text-brand-600 px-2 py-1 rounded">USD</span> : <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded">TWD</span>}</td>
                     <td className="py-5 px-4 text-right font-mono text-slate-600">{formatOriginalMoney(item.avgCostOriginal, item.isUS)}</td>
-                    <td className="py-5 px-4 text-right"><input aria-label={`${item.ticker} 現價`} type="number" step="0.1" disabled={!isAdmin} value={priceInputs[item.ticker] || ''} onChange={e => handlePriceChange(item.ticker, e.target.value)} placeholder={item.avgCostOriginal.toFixed(1)} className={`input-field w-24 text-right ${isAdmin ? 'bg-indigo-50/50 border-indigo-200' : 'bg-transparent border-transparent'}`} /></td>
+                    <td className="py-5 px-4 text-right"><input aria-label={`${item.ticker} 現價`} type="number" step="0.1" disabled={!isAdmin} value={priceInputs[item.ticker] || ''} onChange={e => handlePriceChange(item.ticker, e.target.value)} placeholder={item.avgCostOriginal.toFixed(1)} className={`input-field w-24 text-right ${isAdmin ? 'bg-brand-50/50 border-brand-200' : 'bg-transparent border-transparent'}`} /></td>
                     <td className="py-5 px-4 text-right font-medium text-slate-800">{secureMoney(item.currentValue)}</td>
                     <td className={`py-5 px-4 text-right font-medium ${!isAllowed ? 'text-slate-600' : (item.unrealizedPL >= 0 ? 'text-green-600' : 'text-red-600')}`}>{isAllowed && (item.unrealizedPL >= 0 ? '+' : '')}{secureMoney(item.unrealizedPL)}</td>
                     <td className={`py-5 pl-2 pr-4 text-right font-bold ${!isAllowed ? 'text-slate-600' : (item.returnRate >= 0 ? 'text-green-600' : 'text-red-600')}`}>{isAllowed ? formatPercent(item.returnRate) : "****"}</td>
@@ -104,7 +104,7 @@ export default function Portfolio({ marketPrices, portfolioStats, allocationData
                       value={priceInputs[item.ticker] || ''}
                       onChange={e => handlePriceChange(item.ticker, e.target.value)}
                       placeholder={item.avgCostOriginal.toFixed(1)}
-                      className={`w-full outline-none font-bold text-sm ${isAdmin ? 'text-indigo-600' : 'text-slate-600 bg-transparent'}`}
+                      className={`w-full outline-none font-bold text-sm ${isAdmin ? 'text-brand-600' : 'text-slate-600 bg-transparent'}`}
                     />
                   </div>
                 </div>

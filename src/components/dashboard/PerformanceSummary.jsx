@@ -9,13 +9,13 @@ export default function PerformanceSummary({ display, unitStats, isSpecificInves
     <div className="summary-grid">
       <section className="asset-hero">
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm text-slate-300">{isSpecificInvestor ? '我的資產' : '總資產'}</span>
+          <span className="text-sm text-slate-500">{isSpecificInvestor ? '我的資產' : '總資產'}</span>
           <span className="currency-badge">TWD</span>
         </div>
         <div className="asset-value tabular-nums">{secureMoney(display.assets)}</div>
-        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-300">
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
           <span className="flex items-center gap-2"><Wallet size={14} />{isSpecificInvestor ? '依持有份額計算' : '現金與持倉市值合計'}</span>
-          {isAllowed && <span>當前淨值 <strong className="text-white ml-1">{formatPrice(unitStats.currentUnitPrice)}</strong></span>}
+          {isAllowed && <span>當前淨值 <strong className="text-slate-800 ml-1">{formatPrice(unitStats.currentUnitPrice)}</strong></span>}
         </div>
       </section>
       <Card className="profit-summary">
