@@ -17,6 +17,7 @@ InvestPartner is a shared investment tracker for partners. Keep deposits, withdr
 An administrator maintains the records. Authorized partners can sign in to view them.
 
 For calculation details, tests, and daily snapshot setup, see the [maintenance guide](docs/maintenance.md).
+For Vercel configuration and setup on another computer, see the [environment setup guide](docs/environment-setup.md).
 
 ## Run locally
 
@@ -24,11 +25,11 @@ Install Node.js 20.19+ or 22.12+, then run these commands in the project folder:
 
 ```bash
 npm ci
-npm run dev
+npm run dev:demo
 ```
 
 Open [http://localhost:5173](http://localhost:5173).
 
-The app currently connects to an existing Firebase project. Adding, editing, or deleting records affects live data. For your own installation, replace the Firebase configuration and administrator account in `src/App.jsx` first.
+This starts an isolated demo with fictional data. To use the existing Firebase project, follow the [environment setup guide](docs/environment-setup.md) to download Vercel's Development settings into `.env.local`, then run `npm run dev`. Changes in that mode affect live data.
 
 Website updates follow **GitHub → Vercel automatic deployment**. The Google Apps Script price updater and daily snapshot writer must be updated separately; see the maintenance guide.

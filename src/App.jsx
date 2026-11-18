@@ -19,15 +19,7 @@ import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, arrayUnio
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 
 // --- Firebase 設定 ---
-const firebaseConfig = {
-  apiKey: "AIzaSyAXq_gDK2tr-g-Ak9H0_CBOQtO1PLhNKO8",
-  authDomain: "investpartner-eec26.firebaseapp.com",
-  projectId: "investpartner-eec26",
-  storageBucket: "investpartner-eec26.firebasestorage.app",
-  messagingSenderId: "877215963930",
-  appId: "1:877215963930:web:e50cf7b8bdbf708d59eaa3",
-  measurementId: "G-EWSHSTMNSD"
-};
+const firebaseConfig = import.meta.env.VITE_FIREBASE_CONFIG;
 
 // 初始化 Firebase
 const app = initializeApp(firebaseConfig);

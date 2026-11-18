@@ -31,6 +31,11 @@ Tests use offline fixtures and do not create, modify, or delete production Fireb
 
 After review and verification, commit and push to GitHub for Vercel to deploy. Include `src/lib/` and the test files. Existing data does not require migration or rewriting.
 
+Website Firebase settings are managed in Vercel. See the [environment setup
+guide](environment-setup.md) to configure a computer or refresh `.env.local`.
+Production builds stop when required settings are missing; `npm run dev:demo`
+and `npm run build:demo` work without Firebase settings.
+
 ### Accounting safeguards
 
 | Area | Behavior | Focused tests |

@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Environment values stay in Vercel or on the developer's computer.
+.env
+.env.*
+!.env.example
+.vercel/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
