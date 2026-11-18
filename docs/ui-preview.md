@@ -37,25 +37,29 @@ shader cannot load or WebGL is unavailable. Cards, charts, and inputs retain the
 existing surfaces. The dependency is pinned to avoid unreviewed visual changes.
 Its license and notice are included in `public/licenses/paper-shaders/`.
 
-## App icon trial
+## App icons
 
-The `codex/ui-preview` branch uses the approved warm-gray and forest-green
-overlapping-pane artwork. `docs/images/partner-glass-source.png` preserves the
-original; the PNG/ICO exports in `public/icons/partner-glass-v1/` are resized
-copies. Versioned URLs keep them separate from the existing production icon.
-The original `public/icon.png` remains unchanged.
+The approved app icon uses warm-gray and forest-green overlapping panes.
+`docs/images/partner-glass-source.png` preserves the original artwork; the
+PNG/ICO exports in `public/icons/partner-glass-v1/` are resized copies.
+Versioned URLs avoid reusing the previous icon's browser cache. The original
+blue `public/icon.png` remains unchanged and is available for rollback.
 
-The preview supplies 16/32/48 px browser icons, a 180 px Apple touch icon, and
+The app supplies 16/32/48 px browser icons, a 180 px Apple touch icon, and
 192/512 px manifest icons. The opaque background and centered mark support
-launcher masking. The home-screen name is **IP Preview** so it can coexist with
-the production shortcut. This trial adds no service worker or offline caching.
-The manifest uses same-origin credentials so browsers can load it after the
-existing Vercel preview sign-in; deployment protection remains enabled.
+launcher masking. The production home-screen name is **InvestPartner**; the
+separate preview branch uses **IP Preview** and has `/icon-preview.html` for
+labeled size/crop examples. No service worker or offline caching is added.
+The manifest uses same-origin credentials to support the existing preview
+deployment protection; no security settings are changed.
 
-Open `/icon-preview.html` for labeled size/crop examples. To check a real phone,
-open the preview homepage and add it to the home screen. An existing shortcut
-may retain its old icon; add a fresh preview shortcut if necessary. Keep this
-trial on the preview branch until the icon is accepted for production.
+An existing home-screen shortcut may retain its old icon. Add a fresh shortcut
+from the intended homepage to check it on a real phone.
+
+For a future rollback, point the favicon and Apple touch icon links to
+`/icon.png` with the correct PNG MIME type, and point the manifest icons to
+resized copies of that retained source. Keep the app's name, start URL, and
+scope unchanged. Icon changes require no account or data migration.
 
 ## Demo data
 

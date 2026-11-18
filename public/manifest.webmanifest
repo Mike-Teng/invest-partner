@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "InvestPartner Preview",
-  "short_name": "IP Preview",
+  "name": "InvestPartner",
+  "short_name": "InvestPartner",
   "lang": "zh-Hant",
   "start_url": "/",
   "scope": "/",
