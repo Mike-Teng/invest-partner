@@ -27,7 +27,8 @@ and quiet near-white records have distinct depth, with fewer nested borders.
 The card grain is a local SVG texture.
 
 The page background uses the official [Paper Texture](https://shaders.paper.design/paper-texture)
-shader, with visible roughness and fibers on off-white paper. Its isolated
+shader, with fine, low-contrast grain and fibers on off-white paper. Dark speckles
+are disabled so the glass highlights and shadows remain the focus. Its isolated
 decorative component loads separately, uses no remote images, and runs at speed
 zero with a maximum of about 2 million pixels. A local CSS texture remains if the
 shader cannot load or WebGL is unavailable. Cards, charts, and inputs retain their
