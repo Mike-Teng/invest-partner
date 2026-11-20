@@ -18,6 +18,8 @@ export default function ReconciliationPanel({ reconciliation, portfolioStats, on
     <p>{reconciliation.date} 已確認現金基準 {formatMoney(reconciliation.cashBalance)}；後續資金與交易繼續計入。</p>
     {reconciliation.closedTickers.length > 0 && <p className="text-slate-500 mt-2">已結清舊股數差額：{reconciliation.closedTickers.join('、')}</p>}
     <p className="text-slate-500 mt-2">{reconciliation.reason}</p>
+    <button type="button" disabled={busy} className="btn-ghost text-xs mt-4" onClick={() => run(onBackup)}>下載帳務備份</button>
+    {error && <p role="alert" className="text-sm text-red-600 mt-2">{error}</p>}
   </div>;
   const negative = Object.entries(portfolioStats.holdings).filter(([, holding]) => holding.qty < 0);
   return <form className="p-5 border-t border-slate-100 space-y-4" onSubmit={event => {
