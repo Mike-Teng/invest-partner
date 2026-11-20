@@ -10,7 +10,8 @@ import { safeNumber, formatMoney } from './lib/formatters.js';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { calculateUnitAccounting } from './lib/accounting.js';
 import { calculatePortfolio } from './lib/portfolio.js';
-import { saveLedgerChange, ledgerOperationsCollection, readHistoryBasis } from './lib/firestoreLedger.js';
+import { saveLedgerChange, ledgerOperationsCollection, readHistoryBasis, exportLedgerBackup } from './lib/firestoreLedger.js';
+import { prepareReconciliation } from './lib/reconciliationChanges.js';
 import { stableValue } from './lib/ledgerCommit.js';
 import { buildSnapshot } from './lib/snapshot.js';
 import { taipeiDate } from './lib/entryTime.js';
@@ -54,6 +55,7 @@ export default function App() {
   const [trades, setTrades] = useState([]);
   const [marketPrices, setMarketPrices] = useState({});
   const [historyData, setHistoryData] = useState([]);
+  const [reconciliation, setReconciliation] = useState(null);
   const [ledgerOperations, setLedgerOperations] = useState([]);
   const [operationsReady, setOperationsReady] = useState(false);
   const [historyBasis, setHistoryBasis] = useState({ funds: [], operations: [] });
@@ -116,6 +118,7 @@ export default function App() {
 
   useEffect(() => {
     setIsLoading(true);
+    if (!user) return;
     const unsubFunds = onSnapshot(collection(db, "funds"), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setFunds(data);
@@ -128,6 +131,9 @@ export default function App() {
 
     const unsubPrices = onSnapshot(doc(db, "settings", "market_prices"), (doc) => {
       if (doc.exists()) { setMarketPrices(doc.data()); }
+    });
+    const unsubReconciliation = onSnapshot(doc(db, 'settings', 'ledger_reconciliation'), snapshot => {
+      setReconciliation(snapshot.exists() ? snapshot.data() : null);
     });
 
     const unsubAccess = onSnapshot(doc(db, "settings", "access"), (docSnap) => {
@@ -150,10 +156,11 @@ export default function App() {
       unsubFunds();
       unsubTrades();
       unsubPrices();
+      unsubReconciliation();
       unsubAccess();
       unsubHistory();
     };
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     if (!isAllowed) return;
@@ -219,8 +226,8 @@ export default function App() {
   }, [funds, investors]);
 
   const portfolioStats = useMemo(() => calculatePortfolio(
-    trades, capitalStats.totalCapital, marketPrices,
-  ), [trades, capitalStats.totalCapital, marketPrices]);
+    trades, capitalStats.totalCapital, marketPrices, reconciliation,
+  ), [trades, capitalStats.totalCapital, marketPrices, reconciliation]);
 
   // Stored signed units are the source of truth; cash flows remain separate.
   const unitStats = useMemo(() => calculateUnitAccounting({
@@ -251,7 +258,7 @@ export default function App() {
         const timestamp = Date.now();
         return { collection: 'asset_history', id, before: null,
           after: { id, ...buildSnapshot(ledger.funds, ledger.trades, ledger.marketPrices,
-            ledger.historyData, taipeiDate(timestamp), timestamp) } };
+            ledger.historyData, taipeiDate(timestamp), timestamp, ledger.reconciliation) } };
       });
       notify("已成功記錄今日資產快照！");
     } catch (error) {
@@ -279,9 +286,21 @@ export default function App() {
   };
 
   const saveMarketPrices = prices => setDoc(doc(db, 'settings', 'market_prices'), prices);
+  const onBackup = async () => {
+    if (!isAdmin) throw new Error('僅管理員可操作');
+    const backup = await exportLedgerBackup(db);
+    const url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = `investpartner-backup-${taipeiDate()}.json`; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  const onReconcile = async input => {
+    await changeLedger('reconcile-balances', input, ledger => prepareReconciliation({ ...ledger, ...input }));
+    notify('對帳完成，後續交易將使用確認後的餘額');
+  };
   const dashboardProps = { user, isAdmin, isAllowed, isLoading, investors, unitStats, portfolioStats, historyData,
     historyBasis, operationsReady, exchangeRate, secureMoney, allowedEmails, newEmail, setNewEmail,
-    handleAddEmail, handleRemoveEmail, handleRecordHistory, handleClearHistory,
+    handleAddEmail, handleRemoveEmail, handleRecordHistory, handleClearHistory, reconciliation, onBackup, onReconcile,
     adminEmail: ADMIN_EMAIL, investorMap: INVESTOR_MAP, onNavigate: navigateTo };
 
   const renderContent = () => {

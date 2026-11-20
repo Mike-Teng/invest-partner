@@ -1,14 +1,21 @@
-// Shared by the website and the daily writer. Existing FX accounting is unchanged.
-export function calculatePortfolio(trades, totalCapital, marketPrices) {
+import { activeReconciliation, tradeCashTotals } from './reconciliation.js';
+
+// Shared by the website and the daily writer.
+export function calculatePortfolio(trades, totalCapital, marketPrices, reconciliation = null) {
+  reconciliation = activeReconciliation(reconciliation);
   const exchangeRate = Number(marketPrices.USDTWD) || 32.5;
   if (!(exchangeRate > 0)) throw new Error('Invalid exchange rate');
   let cashBalance = totalCapital;
   const holdings = {};
   // Firestore document order is unrelated to trade order. Never replay it directly.
-  const sorted = [...trades].sort((a, b) =>
+  const sorted = [...trades, ...(reconciliation ? [{ ...reconciliation, checkpoint: true }] : [])].sort((a, b) =>
     a.date.localeCompare(b.date) || Number(a.effectiveAt || a.createdAt || 0) - Number(b.effectiveAt || b.createdAt || 0)
     || String(a.id || '').localeCompare(String(b.id || '')));
   sorted.forEach(trade => {
+    if (trade.checkpoint) {
+      for (const ticker of trade.closedTickers) holdings[ticker] = { qty: 0, totalCostOriginal: 0 };
+      return;
+    }
     const { ticker, type } = trade;
     const price = Number(trade.price);
     const qty = Number(trade.qty);
@@ -30,6 +37,14 @@ export function calculatePortfolio(trades, totalCapital, marketPrices) {
       holding.totalCostOriginal -= averageCost * qty;
     }
   });
+  if (reconciliation) {
+    const totals = tradeCashTotals(trades);
+    // The supplied balance includes USD already converted to TWD. Only movements
+    // after this checkpoint use the current FX rate; old purchases are not repriced.
+    cashBalance = reconciliation.cashBalance + totalCapital - reconciliation.netContributions
+      + totals.TWD - reconciliation.tradeCashTWD
+      + (totals.USD - reconciliation.tradeCashUSD) * exchangeRate;
+  }
   let marketValue = 0;
   const holdingsList = [];
   const warnings = [];

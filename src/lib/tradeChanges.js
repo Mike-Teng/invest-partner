@@ -1,14 +1,21 @@
 import { compareEntries, entryTime } from './entryTime.js';
+import { activeReconciliation, assertAfterReconciliation } from './reconciliation.js';
 
 const epsilon = 1e-8;
 
-function balances(trades, funds, exchangeRate) {
+function balances(trades, funds, exchangeRate, reconciliation) {
   const entries = [...trades.map(trade => ({ ...trade, kind: 'trade' })),
-    ...funds.map(fund => ({ ...fund, kind: 'fund' }))].sort(compareEntries);
+    ...funds.map(fund => ({ ...fund, kind: 'fund' })),
+    ...(reconciliation ? [{ ...reconciliation, kind: 'checkpoint' }] : [])].sort(compareEntries);
   let cash = 0;
   const holdings = {};
   const result = new Map();
   for (const entry of entries) {
+    if (entry.kind === 'checkpoint') {
+      cash = entry.cashBalance;
+      for (const ticker of entry.closedTickers) holdings[ticker] = 0;
+      continue;
+    }
     if (entry.kind === 'fund') { cash += Number(entry.amount); continue; }
     const sign = entry.type === 'BUY' ? 1 : -1;
     const qty = (holdings[entry.ticker] || 0) + sign * Number(entry.qty);
@@ -19,9 +26,10 @@ function balances(trades, funds, exchangeRate) {
   return result;
 }
 
-export function assertSafeTradeChange({ beforeTrades, afterTrades, funds, exchangeRate }) {
-  const before = balances(beforeTrades, funds, exchangeRate);
-  const after = balances(afterTrades, funds, exchangeRate);
+export function assertSafeTradeChange({ beforeTrades, afterTrades, funds, exchangeRate, reconciliation = null }) {
+  reconciliation = activeReconciliation(reconciliation);
+  const before = balances(beforeTrades, funds, exchangeRate, reconciliation);
+  const after = balances(afterTrades, funds, exchangeRate, reconciliation);
   for (const [id, balance] of after) {
     const previous = before.get(id);
     if (balance.qty < -epsilon && (!previous || balance.qty < previous.qty - epsilon)) {
@@ -33,7 +41,7 @@ export function assertSafeTradeChange({ beforeTrades, afterTrades, funds, exchan
   }
 }
 
-export function prepareTradeEntry({ trades, funds, marketPrices, id, date, time, ticker, type, price, qty, now = Date.now() }) {
+export function prepareTradeEntry({ trades, funds, marketPrices, reconciliation, id, date, time, ticker, type, price, qty, now = Date.now() }) {
   ticker = String(ticker).trim().toUpperCase();
   // The existing pricing source recognizes alphabetic US tickers and numeric TW tickers.
   if (!/^([A-Z]+|\d+[A-Z]?)$/.test(ticker)) throw new Error('請填寫支援的股票代號，例如 QQQM、0050 或 00679B');
@@ -46,6 +54,7 @@ export function prepareTradeEntry({ trades, funds, marketPrices, id, date, time,
   const exchangeRate = Number(marketPrices.USDTWD) || 32.5;
   if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) throw new Error('匯率無效，請先核對');
   const trade = { id, date, ticker, type, price, qty, effectiveAt, createdAt: now };
-  assertSafeTradeChange({ beforeTrades: trades, afterTrades: [...trades, trade], funds, exchangeRate });
+  assertAfterReconciliation({ collection: 'trades', after: trade }, reconciliation);
+  assertSafeTradeChange({ beforeTrades: trades, afterTrades: [...trades, trade], funds, exchangeRate, reconciliation });
   return trade;
 }

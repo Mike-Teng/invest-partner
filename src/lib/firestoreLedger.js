@@ -1,5 +1,6 @@
 import { collection, doc, getDocFromServer, getDocsFromServer, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { commitLedgerChange, stableValue } from './ledgerCommit.js';
+import { assertAfterReconciliation } from './reconciliation.js';
 
 const dataOf = snapshot => snapshot.exists() ? snapshot.data() : null;
 const documents = snapshot => snapshot.docs.map(item => ({ ...item.data(), id: item.id }));
@@ -29,11 +30,13 @@ export function saveLedgerChange(db, operationId, actor, prepare) {
     receipt: async () => dataOf(await getDocFromServer(receiptRef)),
     revision: async () => (dataOf(await getDocFromServer(control))?.revision || 0),
     load: async () => {
-      const [funds, trades, historyData, prices] = await Promise.all([
+      const [funds, trades, historyData, prices, reconciliation] = await Promise.all([
         getDocsFromServer(collection(db, 'funds')), getDocsFromServer(collection(db, 'trades')),
         getDocsFromServer(collection(db, 'asset_history')), getDocFromServer(doc(db, 'settings', 'market_prices')),
+        getDocFromServer(doc(db, 'settings', 'ledger_reconciliation')),
       ]);
-      return { funds: documents(funds), trades: documents(trades), historyData: documents(historyData), marketPrices: dataOf(prices) || {} };
+      return { funds: documents(funds), trades: documents(trades), historyData: documents(historyData),
+        marketPrices: dataOf(prices) || {}, reconciliation: dataOf(reconciliation) };
     },
     commit: async (id, revision, ledger, change) => runTransaction(db, async transaction => {
       const receipt = await transaction.get(receiptRef);
@@ -42,6 +45,9 @@ export function saveLedgerChange(db, operationId, actor, prepare) {
       if ((dataOf(latest)?.revision || 0) !== revision) return null;
       const prices = await transaction.get(doc(db, 'settings', 'market_prices'));
       if (stableValue(dataOf(prices) || {}) !== stableValue(ledger.marketPrices)) return null;
+      const reconciliation = await transaction.get(doc(db, 'settings', 'ledger_reconciliation'));
+      if (stableValue(dataOf(reconciliation)) !== stableValue(ledger.reconciliation)) return null;
+      assertAfterReconciliation(change, ledger.reconciliation);
       const target = doc(db, change.collection, change.id);
       const current = await transaction.get(target);
       const currentData = current.exists() ? { ...current.data(), id: current.id } : null;
@@ -60,4 +66,21 @@ export function saveLedgerChange(db, operationId, actor, prepare) {
       return record;
     }),
   }, operationId, prepare);
+}
+
+export async function exportLedgerBackup(db) {
+  // Download a stable copy before a balance correction; this never writes remotely.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const control = doc(db, 'settings', 'ledger_control');
+    const revision = dataOf(await getDocFromServer(control))?.revision || 0;
+    const [funds, trades, history, settings, operations] = await Promise.all([
+      ...['funds', 'trades', 'asset_history', 'settings'].map(path => getDocsFromServer(collection(db, path))),
+      getDocsFromServer(ledgerOperationsCollection(db)),
+    ]);
+    if ((dataOf(await getDocFromServer(control))?.revision || 0) === revision) {
+      return { exportedAt: new Date().toISOString(), revision, funds: documents(funds), trades: documents(trades),
+        asset_history: documents(history), settings: documents(settings), operations: documents(operations) };
+    }
+  }
+  throw new Error('資料持續變動，請稍後重新備份');
 }

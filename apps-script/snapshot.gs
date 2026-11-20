@@ -10,6 +10,8 @@ function parseFields(fields) {
     else if ('doubleValue' in value) result[key] = Number(value.doubleValue);
     else if ('booleanValue' in value) result[key] = value.booleanValue;
     else if ('nullValue' in value) result[key] = null;
+    else if ('arrayValue' in value) result[key] = (value.arrayValue.values || []).map(item => parseFields({ item }).item);
+    else if ('mapValue' in value) result[key] = parseFields(value.mapValue.fields || {});
     else result[key] = value;
   });
   return result;
@@ -24,12 +26,12 @@ function normalizeSnapshotDocuments(raw) {
   });
 }
 
-function calculateSnapshotPortfolio(trades, totalCapital, marketPrices) {
-  return SnapshotPortfolio.calculatePortfolio(trades, totalCapital, marketPrices);
+function calculateSnapshotPortfolio(trades, totalCapital, marketPrices, reconciliation) {
+  return SnapshotPortfolio.calculatePortfolio(trades, totalCapital, marketPrices, reconciliation);
 }
 
-function buildDailySnapshot(funds, trades, marketPrices, historyData, date, timestamp) {
-  return SnapshotBuilder.buildSnapshot(funds, trades, marketPrices, historyData, date, timestamp);
+function buildDailySnapshot(funds, trades, marketPrices, historyData, date, timestamp, reconciliation) {
+  return SnapshotBuilder.buildSnapshot(funds, trades, marketPrices, historyData, date, timestamp, reconciliation);
 }
 
 function readDailySnapshot_() {
@@ -46,7 +48,7 @@ function readDailySnapshot_() {
       throw error;
     }
   };
-  let funds, trades, history, prices;
+  let funds, trades, history, prices, reconciliation;
   let stable = false;
   for (let attempt = 0; attempt < 3; attempt++) {
     const before = readRevision();
@@ -55,12 +57,21 @@ function readDailySnapshot_() {
     history = normalizeSnapshotDocuments(firestore.getDocuments('asset_history'));
     const pricesDocument = firestore.getDocument('settings/market_prices');
     prices = pricesDocument.fields ? parseFields(pricesDocument.fields) : pricesDocument;
+    try {
+      const value = firestore.getDocument('settings/ledger_reconciliation');
+      reconciliation = value?.fields ? parseFields(value.fields) : value;
+      // Some installations return an empty object rather than a 404 for absence.
+      if (!reconciliation || Object.keys(reconciliation).length === 0) reconciliation = null;
+    } catch (error) {
+      if (/404|NOT_FOUND|not found/i.test(String(error))) reconciliation = null;
+      else throw error;
+    }
     if (before === readRevision()) { stable = true; break; }
   }
   if (!stable) throw new Error('Ledger changed during snapshot reads; no snapshot was written');
   const now = new Date();
   const snapshot = buildDailySnapshot(funds, trades, prices, history,
-    Utilities.formatDate(now, 'GMT+8', 'yyyy-MM-dd'), now.getTime());
+    Utilities.formatDate(now, 'GMT+8', 'yyyy-MM-dd'), now.getTime(), reconciliation);
   Logger.log(JSON.stringify({ funds: funds.length, trades: trades.length, snapshot }));
   return { firestore, snapshot };
 }

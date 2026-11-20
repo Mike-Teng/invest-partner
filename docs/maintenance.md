@@ -58,6 +58,32 @@ Audit entries live at `funds/_ledger/operations/{operationId}`. No `_ledger` fun
 
 Direct edits through the Firebase console or external tools do not automatically produce audit entries. Historical USD trade cash still uses the existing exchange-rate calculation. Missing purchase records are not filled in by assumption; reconcile discrepancies before relying on the book cash balance.
 
+### Confirmed balance reconciliation
+
+The administrator can download a ledger backup and confirm a cash balance under
+**Admin tools → Reconciliation**. The amount is the account's combined cash value
+in TWD at that time, including any converted USD. A negative legacy position can
+be closed only when the administrator confirms that no shares remain.
+
+The checkpoint is stored separately at `settings/ledger_reconciliation` with an
+audit receipt in the existing ledger operations collection. It records the prior
+cash and negative positions, the confirmed cash, the date, and the reason. It does
+not invent a missing purchase, add a contribution, issue units, or rewrite an
+existing transaction or snapshot. New purchases start from the confirmed zero
+position with their own costs; normal overselling and cash checks still apply.
+
+Cash after reconciliation equals the confirmed TWD amount plus subsequent fund
+and trade movements. Earlier USD trades no longer change that confirmed amount
+when the quote feed updates FX. This remains a combined TWD cash balance, not a
+separate USD cash ledger. Do not apply the checkpoint repeatedly. Earlier ledger
+entries are protected against edits that would invalidate its baseline; resolving
+their original missing records requires a coordinated new reconciliation.
+
+Deploy the updated Apps Script before recording a checkpoint. New snapshots use
+calculation version 4 and include the checkpoint in their valuation evidence;
+snapshots before its effective time keep the previous calculation. The price
+updater still writes only market prices and cannot overwrite the checkpoint.
+
 ## Daily snapshots
 
 The Google Apps Script project `updateStockPrices` runs `recordDailySnapshot` on a time-based trigger. The website also has a separate manual snapshot action. `updateStockPrices` reads the `Stocks` sheet to update market prices in Firebase.

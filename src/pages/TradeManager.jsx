@@ -34,7 +34,7 @@ export default function TradeManager({ notify, trades, portfolioStats, isAdmin, 
           const before = ledger.trades.find(trade => trade.id === id);
           if (!before) throw new Error('找不到這筆紀錄，請重新整理');
           assertSafeTradeChange({ beforeTrades: ledger.trades, afterTrades: ledger.trades.filter(trade => trade.id !== id),
-            funds: ledger.funds, exchangeRate: Number(ledger.marketPrices.USDTWD) || 32.5 });
+            funds: ledger.funds, exchangeRate: Number(ledger.marketPrices.USDTWD) || 32.5, reconciliation: ledger.reconciliation });
           return { collection: 'trades', id, before, after: null };
         });
       } catch (error) { notify(error.message || '刪除失敗'); }

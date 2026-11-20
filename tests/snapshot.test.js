@@ -56,7 +56,7 @@ test('typed Firestore zero, negative numbers and empty strings are decoded witho
 test('preview cannot write data and scheduled execution writes one verifiable snapshot', () => {
   const writes = [];
   const db = {
-    getDocuments: () => [], getDocument: () => ({ fields: { USDTWD: { doubleValue: 30 } } }),
+    getDocuments: () => [], getDocument: path => path === 'settings/market_prices' ? { fields: { USDTWD: { doubleValue: 30 } } } : {},
     createDocument: (...args) => writes.push(args),
   };
   const context = runtime({
